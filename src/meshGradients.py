@@ -8,7 +8,6 @@ from scipy.sparse import csc_matrix, csr_matrix, bsr_matrix
 import scipy.sparse.linalg as splinalg
 
 from meshUtils import *
-from IPython import embed
 
 
 def interpTri2Vrt(mesh, phi):

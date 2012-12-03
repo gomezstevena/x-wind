@@ -5,7 +5,7 @@ Simple unsteady flow solver in python.
 
 Dependencies:
 ============
-* Ani2d [http://sourceforge.net/projects/ani2d/](http://sourceforge.net/projects/ani2d/)
+* Ani2D [http://sourceforge.net/projects/ani2d/](http://sourceforge.net/projects/ani2d/)
 * numpy [http://numpy.scipy.org/](http://numpy.scipy.org/)
 * scipy [http://numpy.scipy.org/]( http://numpy.scipy.org/)
 

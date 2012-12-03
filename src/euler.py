@@ -7,7 +7,6 @@ from scipy.interpolate import griddata
 
 from mesh import *
 
-from IPython import embed
 
 def gask(W, gamma=1.4):
     '''
@@ -172,7 +171,7 @@ class Euler:
         dWL = (gradW[m.e[:,2],:] * dxt[:,:,newaxis]).sum(1)
         dWR = (gradW[m.e[:,3],:] * dxt[:,:,newaxis]).sum(1)
 
-        embed()
+        #embed()
 
         flux = fluxE(WL, WR, m.n) + fluxD(WL, WR, dWL, dWR, m.n, self.HiRes)
         # boundary condition categories
