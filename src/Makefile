@@ -3,18 +3,23 @@ ANI2DLIB = -laft2D-3.0 -lmba2D-3.0
 
 LIB = $(ANI2DLIB) -llapack -lm
 
+FC=gfortran
+
+OUT=aftMesh mbaMesh
 
 default:	aftMesh mbaMesh
 
 aftMesh:	aftMesh.o 
-	gfortran -o $@ $< -L$(ANI2DLIB_DIR) $(LIB)
+	$(FC) -o $@ $< -L$(ANI2DLIB_DIR) $(LIB)
 
 aftMesh.o:	aftMesh.f
-	gfortran -c $<
+	$(FC) -c $<
 
 mbaMesh:	mbaMesh.o 
-	gfortran -o $@ $< -L$(ANI2DLIB_DIR) $(LIB)
+	$(FC) -o $@ $< -L$(ANI2DLIB_DIR) $(LIB)
 
 mbaMesh.o:	mbaMesh.f
-	gfortran -c $<
+	$(FC) -c $<
 
+clean:
+	rm *.o $(OUT)
