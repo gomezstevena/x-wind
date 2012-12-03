@@ -4,6 +4,12 @@ x-wind
 Simple unsteady flow solver in python.
 
 
+Copyright
+=========
+Copyright (C) 2012 Qiqi Wang and Steven Gomez
+
+
+
 License
 =======
 
