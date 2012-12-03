@@ -1,4 +1,4 @@
-Copyright 2012 Qiqi Wang and Steven Gomez
+Copyright (C) 2012 Qiqi Wang and Steven Gomez
 
 
 
