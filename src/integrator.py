@@ -46,7 +46,6 @@ class Ode:
                     break
 
                 tmp = self.I - a*J;
-
                 #dy = splinalg.spsolve(tmp, res)
                 dy, err = splinalg.gmres( tmp, res, tol=1e-6)
                 self.y -= dy

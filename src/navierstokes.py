@@ -2,6 +2,7 @@ import os
 from pylab import *
 from numpy import *
 from scipy.sparse import kron as spkron
+from scipy.sparse import linalg as splinalg
 
 from mesh import *
 from euler import *
@@ -108,6 +109,51 @@ class NavierStokes(Euler):
         J_flux = fluxJ_UE * self.matJacUE * jacW2U \
                + fluxJ_gradUE * self.matGradU * jacW2U
         return Euler.J(self, W) + self.matJacDistFlux * J_flux
+
+    def J_Oper(self, W ):
+        if not self.__dict__.has_key('matGradU'):
+            self.prepareJacMatricesVisc()
+        #ddtEuler = Euler.ddt(self, W)
+        # Navier Stokes terms
+        assert W.size == self.nt * 4
+        shp = W.shape
+        W = W.reshape([-1, 4])
+        m = self.mesh
+        q, p, u, c = gask(W)
+        # velocity is 0 at wall, copy cell velocity at far field
+        uBc = zeros([m.ieBnd.size, 2])
+        xeBnd = m.v[m.e[m.ieBnd,:2],:].mean(1)
+        isFar = m.isFar(xeBnd)
+        ieFar = m.ieBnd[isFar]
+        uBc[isFar,:] = u[m.e[ieFar,3],:]
+        # compute uE and graduE
+        uE = 0.5 * (u[m.e[:,2],:] + u[m.e[:,3],:])
+        graduE = m.gradTriEdg(u, uBc)
+        # Before are same as in ddt. now Jacobian computation
+        nE, nT = m.e.shape[0], m.t.shape[0]
+        jacW2U = zeros([nT, 2, 4])
+        jacW2U[:,[0,1],[1,2]] = 1./ W[:,:1]
+        jacW2U[:,:,0] = -u / W[:,:1]
+        jacW2U = block_diags(jacW2U)
+        fluxJ_UE, fluxJ_gradUE = jacV(uE, graduE, m.n)
+        fluxJ_UE = block_diags(self.mu * fluxJ_UE.reshape((-1,4,2)))
+        fluxJ_gradUE = block_diags(self.mu * fluxJ_gradUE.reshape((-1,4,4)))
+
+        EJ = Euler.J(self, W)
+
+
+        def matvec(self, X):
+
+            out = EJ*X
+            JW2_X = jacW2U * X
+            #JFlux_X = 
+            out += self.matJacDistFlux * JFlux_X
+
+
+        return None
+
+
+
 
     def prepareJacMatricesVisc(self):
         m = self.mesh
