@@ -231,7 +231,7 @@ class Euler:
         W = W.reshape([-1, 4])
         m = self.mesh
         # no limiter yet
-        assert self.HiRes == 0
+        # assert self.HiRes == 0
         WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
         isFar = m.isFar(m.v[m.e[m.ieBnd,:2],:].mean(1))
         WL[m.ieBnd[isFar]] = self.freeStream(1)
@@ -264,9 +264,9 @@ class Euler:
         if W is None: W = self.soln
         gradV = self.mesh.gradTriVrt(W / self.Wref)
         # weight by entropy adjoint
-        q, p, u, c = gask(W)
-        V = hstack([q[:,newaxis], W[:,1:3], W[:,:1]]) * self.Wref
-        gradV *= self.mesh.interpTri2Vrt(V)[:,newaxis,:]
+        # q, p, u, c = gask(W)
+        # V = hstack([q[:,newaxis], W[:,1:3], W[:,:1]]) * self.Wref
+        # gradV *= self.mesh.interpTri2Vrt(V)[:,newaxis,:]
         return (gradV[:,newaxis,:,:] * gradV[:,:,newaxis,:]).sum(-1)
         # return hessian.sum(-1)
 

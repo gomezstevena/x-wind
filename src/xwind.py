@@ -9,7 +9,6 @@ gobject.threads_init()
 from matplotlib.figure import Figure
 from pylab import *
 from numpy import *
-from scipy.interpolate import griddata
 
 from navierstokes import *
 from meshVisualize import Visualize
@@ -20,12 +19,13 @@ from matplotlib.backends.backend_gtkagg \
 from matplotlib.backends.backend_gtkagg \
      import NavigationToolbar2GTKAgg as NavigationToolbar
 
+from scipy.interpolate import griddata
 
 def chooseSolver(v, t, b, Mach, Re):
     if isfinite(Re):
         return NavierStokes(v, t, b, Mach, Re, HiRes=1)
     else:
-        return Euler(v, t, b, Mach, HiRes=0)
+        return Euler(v, t, b, Mach, HiRes=1)
 
 
 class SolverGuiCoupler:
@@ -85,11 +85,14 @@ class SolverGuiCoupler:
         
     def update(self):
         'Called automatically every second to update screen'
-        self.solnLock.acquire()
-        t, soln = self._soln_t, self._soln_copy.copy()
-        self.solnLock.release()
-        field = physical(soln, self.combobox.get_active_text())
-        self.vis.update('MIT xWind  t ={0:10.6f}'.format(t), field)
+        try:
+            self.solnLock.acquire()
+            t, soln = self._soln_t, self._soln_copy.copy()
+            self.solnLock.release()
+            field = physical(soln, self.combobox.get_active_text())
+            self.vis.update('MIT xWind  t ={0:10.6f}'.format(t), field)
+        except:
+            self.solnLock.release()
         return True
 
     def changeGeom(self):

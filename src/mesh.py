@@ -8,7 +8,6 @@ import meshAni2D as _ani
 import meshGradients as _grad
 import meshVisualize as _vis
 
-
 def extractEdges(v, t):
     '''
     EXTRACTEDGES extract all edges in a triangular mesh
