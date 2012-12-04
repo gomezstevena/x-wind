@@ -21,7 +21,7 @@ class accumarray:
     '''
     def __init__(self, indx, n=None):
         if n is None: n = indx.max() + 1
-        self.mat = csc_matrix((ones(indx.size), (indx, r_[:indx.size])), \
+        self.mat = csc_matrix( (ones(indx.size), (indx, r_[:indx.size])), \
                               shape = (n, indx.size))
 
     def __call__(self, value):
@@ -29,6 +29,15 @@ class accumarray:
         value = value.reshape([shape[0], -1])
         return (self.mat * value).reshape((-1,) + shape[1:])
 
+def indexMap(indx, n = None, weight = 1):
+    if n is None: n = indx.max() + 1
+    shape = (indx.size, n)
+
+    vals = repeat(weight, indx.size)
+    return csr_matrix( (vals, (r_[:indx.size], indx) ), shape=shape  )
+
+def dot_each(a, b):
+    return einsum('ni, ni -> n', a, b)
 
 def invertMap(m):
     '''
@@ -87,9 +96,9 @@ def accum_slow(inds, vals):
     return A
 
 if __name__ == '__main__':
-    
-    fi = load("accum_test.npz")
-    inds, vals, out = fi['inds'], fi['vals'], fi['out']
-    fi.close()
+    n = 25
+    indx = randint(n, size=100)
 
-    assert all( accumarray(inds)(vals) == bincount(inds, vals) )
+    A = accumarray(indx, n = n).mat
+    B = indexMap(indx, n = n)
+

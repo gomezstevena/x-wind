@@ -1,4 +1,5 @@
 from numpy import *
+from scipy import sparse
 from scipy.sparse import csc_matrix, csr_matrix, bsr_matrix
 import scipy.sparse.linalg as splinalg
 
@@ -113,21 +114,28 @@ class Mesh:
 
         self.edgOfTri = invertMap(self.e[:,2:])[1].reshape([-1, 3])
 
-        edgeMeanMapT = accumarray(self.edgOfTri[:,0], self.ne ).mat
+
+        # EdgeMean when multiplied by values at edges gives values 
+        # at triangles by averaging across edges
+        self.edgeMean = indexMap( self.edgOfTri[:,0], self.ne, 1./3. )
         for i in xrange(1, 3):
-            edgeMeanMapT = edgeMeanMapT + accumarray(self.edgOfTri[:,i], self.ne ).mat
+            self.edgeMean = self.edgeMean + indexMap( self.edgOfTri[:,i], self.ne, 1./3. )
 
-        edgeMeanMapT /= 3.0
+        # Clean up edge Mean matrix
+        self.edgeMean.sum_duplicates()
+        self.edgeMean.prune()
 
-        self.edgeMean = edgeMeanMapT.transpose().tocsr()
 
-        self.leftMap  = accumarray(self.e[:,2]).mat.transpose().tocsr()
-        self.rightMap = accumarray(self.e[:,3]).mat.transpose().tocsr()
+        lmap = indexMap(self.e[:,2], self.nt)
+        rmap = indexMap(self.e[:,3], self.nt)
+        self.lr_map = sparse.vstack([lmap, rmap], format='csr')
 
         ## X-location of each triangle center
         self._xt = self.v[self.t,:].mean(1)
 
-        self._dxt = self._xt[self.e[:,3],:] - self._xt[self.e[:,2],:]
+        xl, xr = self.leftRightTri(self._xt)
+        self._dxt = xr-xl #self._xt[self.e[:,3],:] - self._xt[self.e[:,2],:]
+
 
 
     @property
@@ -172,16 +180,11 @@ class Mesh:
         Input: W values on triangle shape:(nt, vshape)
         Output: W value on (left, right) of each edge (ne, vshape), (ne, vshape)
         '''
-        vshape = W.shape[1:]
-        out_shape = (self.ne,) + vshape
-
         Wf = W.reshape( (self.nt, -1) )
-        
-        WL = reshape(self.leftMap * Wf, out_shape)
-        WR =  reshape(self.rightMap * Wf, out_shape)
 
-        return WL, WR
-
+        Wlr = self.lr_map * Wf
+        Wlr.shape = (2*self.ne,) + W.shape[1:]
+        return Wlr[:self.ne], Wlr[self.ne:]
 
     def plotMesh(self, detail=0, alpha=1):
         '''

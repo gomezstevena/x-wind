@@ -7,8 +7,6 @@ from scipy.interpolate import griddata
 
 from mesh import *
 
-from IPython import embed
-
 def gask(W, gamma=1.4):
     '''
     Returns kinetic energy q, pressure p, velocity u and sound speed c
@@ -16,12 +14,13 @@ def gask(W, gamma=1.4):
     u = W[:,1:3] / W[:,:1]           # velocity
 
     #q = 0.5 * W[:,0] * sum(u**2,1)   # kinetic energy
-    q = einsum('ni, ni -> n', u, u); q *= W[:,0]; q*= 0.5; #almost twice as fast
+    q = dot_each(u, u); q *= W[:,0]; q*= 0.5; #almost twice as fast
 
     p = (W[:,3] - q); p *= (gamma - 1)   # pressure
 
     #c = sqrt(gamma * p / W[:,0] )     # speed of sound
     c = p/W[:,0]; c*=gamma; sqrt(c, out=c)
+
     return q, p, u, c
 
 def jacConsSym(W, n=None, gamma=1.4):
@@ -74,7 +73,7 @@ def fluxE(WL, WR, n):
     assert WL.shape == WR.shape == n.shape[:1] + (4,)
     WE = 0.5 * (WL + WR)
     q, p, u, c = gask(WE)
-    uDotN = (u * n).sum(1)
+    uDotN = dot_each(u, n) #(u * n).sum(1)
     flux = zeros(WL.shape)
     flux[:,0] = WE[:,0] * uDotN
     flux[:,1:3] = WE[:,1:3] * uDotN[:,newaxis] + p[:,newaxis] * n
@@ -89,9 +88,9 @@ def jacE(WE, n):
 
 def specRad(WE, n, gamma=1.4):
     q, p, u, c = gask(WE, gamma)
-    uDotN = (u * n).sum(1)
-    cNrmN = c * sqrt((n**2).sum(1))
-    return (abs(uDotN) + cNrmN)
+    uDotN = dot_each(u, n) #(u * n).sum(1)
+    cNrmN = c * sqrt( dot_each(n,n) )#sqrt((n**2).sum(1))
+    return (absolute(uDotN) + cNrmN)
 
 def fluxD(WL, WR, dWL, dWR, n, HiRes=0):
     assert WL.shape == WR.shape == n.shape[:1] + (4,)
@@ -104,7 +103,7 @@ def fluxD(WL, WR, dWL, dWR, n, HiRes=0):
         # which are computed as averages of edge gradients
         dWL, dWR = 1.5 * dWL - 0.5 * dW, 1.5 * dWR - 0.5 * dW
         limSign = (dWL * dW > 0) * (dWR * dW > 0) * sign(dW)
-        limiter = limSign * minimum(abs(dW), minimum(abs(dWR), abs(dWL)))
+        limiter = limSign * minimum(absolute(dW), minimum(absolute(dWR), absolute(dWL)))
         flux += 0.5 * limiter * A * HiRes
     return flux
 
@@ -180,12 +179,9 @@ class Euler:
 
         #dWL = (gradW[m.e[:,2],:] * dxt[:,:,newaxis]).sum(1)
         #dWR = (gradW[m.e[:,3],:] * dxt[:,:,newaxis]).sum(1)
-
         gWL, gWR = m.leftRightTri(gradW) #about 3 times as fast
         dWL = einsum( 'nij, ni -> nj', gWL, dxt )
         dWR = einsum( 'nij, ni -> nj', gWR, dxt )
-
-        #embed()
 
         flux = fluxE(WL, WR, m.n) + fluxD(WL, WR, dWL, dWR, m.n, self.HiRes)
         # boundary condition categories
