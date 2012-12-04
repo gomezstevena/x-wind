@@ -9,14 +9,12 @@ import scipy.sparse.linalg as splinalg
 
 from meshUtils import *
 
-
 def interpTri2Vrt(mesh, phi):
     a0 = accumarray(ravel(mesh.t[:,0]), mesh.v.shape[0])
     a1 = accumarray(ravel(mesh.t[:,1]), mesh.v.shape[0])
     a2 = accumarray(ravel(mesh.t[:,2]), mesh.v.shape[0])
     one = ones(mesh.t.shape[0])
     n = a0(one) + a1(one) + a2(one)
-
     n = n.reshape((-1,) + (1,) * (phi.ndim - 1))
     return (a0(phi) + a1(phi) + a2(phi)) / n
 
@@ -28,10 +26,8 @@ def gradTri(mesh, phi, phiBc):
     assert phi.shape[0] == mesh.t.shape[0]
     # edge gradient for each triangle
     gradEdg = gradTriEdg(mesh, phi, phiBc)
-    #edgOfTri = invertMap(mesh.e[:,2:])[1].reshape([-1, 3])
     # average of edge gradients
     
-    #return gradEdg[mesh.edgOfTri].mean(1)
     return edgeToTri(mesh, gradEdg)
 
 def edgeToTri(mesh, edgVal):
@@ -57,12 +53,11 @@ def gradTriVrt(mesh, phi, phiBc):
     gradEdg = gradTriEdg(mesh, phi, phiBc)
     # average of edge gradients
 
-    
     a2 = accumarray(ravel(mesh.e[:,0]), mesh.v.shape[0])
     a3 = accumarray(ravel(mesh.e[:,1]), mesh.v.shape[0])
     n = a2(ones(mesh.e.shape[0])) + a3(ones(mesh.e.shape[0]))
     
-    #this works here but can't handle more complicated inputs
+    # this works here but can't handle more complicated inputs
     #n = bincount( mesh.e[:,0].ravel() ) + bincount( mesh.e[:,1].ravel() )
 
     n = n.reshape((-1,) + (1,) * phi.ndim)
@@ -154,3 +149,14 @@ def distributeFlux(mesh, flux, isAdjoint=False):
         return mesh.matDistFlux * flux
     else:
         return mesh.matDistFlux.T * flux
+
+def interpTri2Edg(mesh, value):
+    if not mesh.__dict__.has_key('matInterpTri2Edg'):
+        mat2 = accumarray(mesh.e[:,2], mesh.t.shape[0]).mat
+        mat3 = accumarray(mesh.e[:,3], mesh.t.shape[0]).mat
+        mesh.matInterpTri2Edg = 0.5 * (mat2 + mat3)
+    if isAdjoint:
+        return mesh.matInterpTri2Edg * value
+    else:
+        return mesh.matInterpTri2Edg.T * value
+

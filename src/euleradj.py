@@ -105,7 +105,7 @@ class EulerAdj:
         # interior flux adjoint
         Qflux[m.ieBnd] = 0
         QE = (jacE(WE, m.n) * Qflux[:,:,newaxis]).sum(1)
-        dQdt = cellAvg(m, QE, isAdjoint=True)
+        dQdt = m.interpTri2Edg(QE, isAdjoint=True)
         # numerical dissipation flux adjoint
         dQdt -= m.distributeFlux(fluxDsemiAdj(WE, Qflux, m.n))
         dQdt[m.e[m.ieBnd,3]] += dQdtBnd

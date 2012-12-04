@@ -1,6 +1,10 @@
 from numpy import *
 from scipy.sparse import csc_matrix, csr_matrix, bsr_matrix
 
+def block_diags(blocks):
+    assert blocks.ndim == 3
+    n = blocks.shape[0]
+    return bsr_matrix((blocks, r_[:n], r_[:n+1]))
 
 def matrixMult(*mats):
     assert len(mats) > 1
@@ -21,7 +25,7 @@ class accumarray:
     '''
     def __init__(self, indx, n=None):
         if n is None: n = indx.max() + 1
-        self.mat = csc_matrix( (ones(indx.size), (indx, r_[:indx.size])), \
+        self.mat = csc_matrix((ones(indx.size), (indx, r_[:indx.size])), \
                               shape = (n, indx.size))
 
     def __call__(self, value):

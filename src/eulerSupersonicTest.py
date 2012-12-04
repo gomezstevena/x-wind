@@ -3,7 +3,6 @@ matplotlib.use('Agg')
 import os
 from pylab import *
 from numpy import *
-from scipy.integrate import ode
 from scipy.interpolate import griddata
 
 from mesh import *
@@ -14,7 +13,7 @@ geom = rotate(geom, 10*pi/180)
 nE = 1000
 dt = 0.0001
 Mach = 4.0
-HiRes = 0.8
+HiRes = 0.0
 
 if not os.path.exists('fig'): os.mkdir('fig')
 

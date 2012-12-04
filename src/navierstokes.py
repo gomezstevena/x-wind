@@ -1,8 +1,7 @@
 import os
 from pylab import *
 from numpy import *
-from scipy.integrate import ode
-from scipy.interpolate import griddata
+from scipy.sparse import kron as spkron
 
 from mesh import *
 from euler import *
@@ -23,11 +22,39 @@ def fluxV(UE, gradUE, n):
     flux[:,3] = (flux[:,1:3] * UE).sum(1)
     return flux
 
+def jacV(UE, gradUE, n):
+    '''
+    Viscous flux in NS equation
+    '''
+    assert UE.shape == n.shape[:1] + (2,)
+    assert gradUE.shape == n.shape[:1] + (2,2)
+    # original flux
+    flux = zeros([gradUE.shape[0], 4])
+    f1 = (gradUE * n[:,:,newaxis]).sum(1) \
+       + (gradUE * n[:,newaxis,:]).sum(2)
+    f2 = gradUE[:,[0,1],[0,1]].sum(1)[:,newaxis] * n
+    # momentum viscous flux
+    flux[:,1:3] = -f1 + 2/3. * f2
+    # start Jacobian
+    fluxJ_UE = zeros(n.shape[:1] + (4,2))
+    fluxJ_gradUE = zeros(n.shape[:1] + (4,2,2))
+    f1Jac = n[:,newaxis,:,newaxis] * eye(2)[newaxis,:,newaxis,:] \
+          + n[:,newaxis,newaxis,:] * eye(2)[newaxis,:,:,newaxis]
+    f2Jac = n[:,:,newaxis,newaxis] * eye(2)[newaxis,newaxis,:,:]
+    # momentum viscous flux
+    fluxJ_gradUE[:,1:3] = -f1Jac + 2/3. * f2Jac
+    # energy viscous flux, ignore conduction
+    fluxJ_gradUE[:,3] = (fluxJ_gradUE[:,1:3] * UE[:,:,newaxis,newaxis]).sum(1)
+    fluxJ_UE[:,3] = flux[:,1:3]
+    return fluxJ_UE, fluxJ_gradUE
+
+
 class NavierStokes(Euler):
     def __init__(self, v, t, b, Mach, Re, HiRes=.9):
         Euler.__init__(self, v, t, b, Mach, HiRes)
         # compute viscosity from Reynolds number
         self.mu = self.Wref[1] / Re
+        self.prepareJacMatricesVisc()
 
     def ddt(self, W):
         ddtEuler = Euler.ddt(self, W)
@@ -50,6 +77,47 @@ class NavierStokes(Euler):
         ddtVisc = (m.distributeFlux(flux) / m.a[:,newaxis]).reshape(shp)
         return ddtEuler + ddtVisc
 
+    def J(self, W):
+        ddtEuler = Euler.ddt(self, W)
+        # Navier Stokes terms
+        assert W.size == self.nt * 4
+        shp = W.shape
+        W = W.reshape([-1, 4])
+        m = self.mesh
+        q, p, u, c = gask(W)
+        # velocity is 0 at wall, copy cell velocity at far field
+        uBc = zeros([m.ieBnd.size, 2])
+        xeBnd = m.v[m.e[m.ieBnd,:2],:].mean(1)
+        isFar = m.isFar(xeBnd)
+        ieFar = m.ieBnd[isFar]
+        uBc[isFar,:] = u[m.e[ieFar,3],:]
+        # compute uE and graduE
+        uE = 0.5 * (u[m.e[:,2],:] + u[m.e[:,3],:])
+        graduE = m.gradTriEdg(u, uBc)
+        # Before are same as in ddt. now Jacobian computation
+        #jacW2U = bla TODO
+        fluxJ_UE, fluxJ_gradUE = jacV(uE, graduE, m.n)
+        fluxJ_UE = block_diags(fluxJ_UE.reshape((-1,4,2)))
+        fluxJ_gradUE = block_diags(fluxJ_gradUE.reshape((-1,4,4)))
+        J_flux = fluxJ_UE * self.matJacUE * jacW2U \
+               + fluxJ_gradUE * self.matGradU * jacW2U
+        return Euler.J(self, W) + self.matJacDistFlux * J_flux
+
+    def prepareJacMatricesVisc(self):
+        m = self.mesh
+        # velocity gradient operator matrix
+        xeBnd = m.v[m.e[m.ieBnd,:2],:].mean(1)
+        isFar = m.isFar(xeBnd)
+        ieFar = m.ieBnd[isFar]
+        indi, indj = isFar.nonzero()[0], e[ieFar,3]
+        matJacUBc = csr_matrix((ones(isFar.sum()), (indi, indj)))
+        matGradU = m.matGradTriEdg + m.bcmatGradTriEdg * matJacUBc
+        self.matGradU = spkron(matGradU, eye(2)).tocsr()
+        # velocity avarage matrix
+        matL = accumarray(m.e[:,2], m.t.shape[0]).mat.T
+        matR = accumarray(m.e[:,3], m.t.shape[0]).mat.T
+        self.matJacUE = spkron(0.5 * (matL + matR), eye(2)).tocsr()
+
     def metric(self, W=None):
         '''
         Hessian of NS flow is different from Euler flow at wall
@@ -62,6 +130,10 @@ class NavierStokes(Euler):
         isWall = ~m.isFar(xeBnd)
         Wbnd[isWall,1:3] = 0
         # freestream reference
-        grad = self.mesh.gradTriVrt(W / self.Wref, Wbnd / self.Wref)
-        return (grad[:,newaxis,:,:] * grad[:,:,newaxis,:]).sum(-1)
+        gradV = self.mesh.gradTriVrt(W / self.Wref, Wbnd / self.Wref)
+        # weight by entropy adjoint
+        q, p, u, c = gask(W, gamma)
+        V = hstack([q[:,newaxis], W[:,1:3], W[:,:1]]) * self.Wref
+        gradV *= m.interpTri2Vrt(V)
+        return (gradV[:,newaxis,:,:] * gradV[:,:,newaxis,:]).sum(-1)
 

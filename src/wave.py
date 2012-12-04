@@ -47,6 +47,7 @@ class Wave:
         indx = hstack([m.e[:,2], m.e[:,3], m.e[m.ieBnd,2]])
         return (accumarray(indx)(flux) / m.a[:,newaxis]).reshape(shp)
 
+
 if __name__ == '__main__':
     geom = [[1, 0], [0.3, 0], [0, 0.1], [-0.3, 0], [-1, 0], [-0.4, -0.5],
             [-0.7, -1.2], [0, -0.1], [0.7, -1.2], [0.4, -0.5], [1, 0]]

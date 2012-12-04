@@ -107,7 +107,6 @@ class Mesh:
         self.a = triArea(v, t)
         self.n = edgNormal(v, self.e)
 
-
         self.ieBnd = (self.e[:,3] == self.e[:,2]).nonzero()[0]
 
 
@@ -126,9 +125,9 @@ class Mesh:
         self.edgeMean.prune()
 
 
-        lmap = indexMap(self.e[:,2], self.nt)
-        rmap = indexMap(self.e[:,3], self.nt)
-        self.lr_map = sparse.vstack([lmap, rmap], format='csr')
+        self.lmap = indexMap(self.e[:,2], self.nt)
+        self.rmap = indexMap(self.e[:,3], self.nt)
+        self.lr_map = sparse.vstack([self.lmap, self.rmap], format='csr')
 
         ## X-location of each triangle center
         self._xt = self.v[self.t,:].mean(1)
@@ -169,7 +168,7 @@ class Mesh:
 
     
     def xt(self):
-        return self._xt #v[self.t,:].mean(1)
+        return self._xt
     
     @property
     def dxt(self):
@@ -186,6 +185,7 @@ class Mesh:
         Wlr.shape = (2*self.ne,) + W.shape[1:]
         return Wlr[:self.ne], Wlr[self.ne:]
 
+    # -------------- plotting ---------------- #
     def plotMesh(self, detail=0, alpha=1):
         '''
         draw primal and dual mesh and edge normals
@@ -221,6 +221,7 @@ class Mesh:
         return _vis.plotVrtScalar(self, phi)
 
 
+    # -------------- gradients --------------- #
     def gradTri(self, phi, phiBc=None):
         '''
         Input: scalar field phi of shape (nt,m) defined on triangles
@@ -256,6 +257,9 @@ class Mesh:
 
     def interpTri2Vrt(self, phi):
         return _grad.interpTri2Vrt(self, phi)
+
+    def interpTri2Edg(self, phi, isAdjoint=False):
+        return _grad.interpTri2Edg(self, phi, isAdjoint)
 
 if __name__ == '__main__':
     v, t, b = initMesh( \

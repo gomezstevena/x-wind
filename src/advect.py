@@ -32,8 +32,9 @@ class Advect:
         # accumunate to cells
         flux = hstack([-fluxE, fluxE, fluxE[iBnd]])
         indx = hstack([m.e[:,2], m.e[:,3], m.e[iBnd,2]])
-        #return accumarray(indx)(flux) / m.a
+
         return bincount(indx, flux) / m.a
+        #return accumarray(indx)(flux) / m.a
 
 
 if __name__ == '__main__':

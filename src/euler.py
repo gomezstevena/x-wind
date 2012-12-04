@@ -1,11 +1,10 @@
 import os
-import threading
 from pylab import *
 from numpy import *
-from scipy.integrate import ode
-from scipy.interpolate import griddata
+from scipy.sparse import kron as spkron
 
 from mesh import *
+from integrator import Ode
 
 def gask(W, gamma=1.4):
     '''
@@ -14,14 +13,27 @@ def gask(W, gamma=1.4):
     u = W[:,1:3] / W[:,:1]           # velocity
 
     #q = 0.5 * W[:,0] * sum(u**2,1)   # kinetic energy
-    q = dot_each(u, u); q *= W[:,0]; q*= 0.5; #almost twice as fast
-
+    q = dot_each(u, u); q *= W[:,0]; q*= 0.5;
     p = (W[:,3] - q); p *= (gamma - 1)   # pressure
-
     #c = sqrt(gamma * p / W[:,0] )     # speed of sound
     c = p/W[:,0]; c*=gamma; sqrt(c, out=c)
 
     return q, p, u, c
+
+def jacGask(W, gamma=1.4):
+    q, p, u, c = gask(W, gamma)
+    jacU = zeros(W.shape[:1] + (2,4))
+    jacU[:,[0,1],[1,2]] = 1./ W[:,:1]
+    jacU[:,:,0] = -u / W[:,:1]
+    jacQ = zeros(W.shape)
+    jacQ[:,1:3] = u
+    jacQ[:,0] = -q / W[:,0]
+    jacP = -jacQ * (gamma - 1)
+    jacP[:,3] = gamma - 1
+    jacC = jacP / p[:,newaxis]
+    jacC[:,0] -= 1 / W[:,0]
+    jacC *= 0.5 * c[:,newaxis]
+    return jacQ, jacP, jacU, jacC
 
 def jacConsSym(W, n=None, gamma=1.4):
     '''
@@ -69,12 +81,11 @@ def jacConsSym(W, n=None, gamma=1.4):
     else:
         return S, T
 
-def fluxE(WL, WR, n):
-    assert WL.shape == WR.shape == n.shape[:1] + (4,)
-    WE = 0.5 * (WL + WR)
+def fluxE(WE, n):
+    assert WE.shape == n.shape[:1] + (4,)
     q, p, u, c = gask(WE)
     uDotN = dot_each(u, n) #(u * n).sum(1)
-    flux = zeros(WL.shape)
+    flux = zeros(WE.shape)
     flux[:,0] = WE[:,0] * uDotN
     flux[:,1:3] = WE[:,1:3] * uDotN[:,newaxis] + p[:,newaxis] * n
     flux[:,3] = (WE[:,3] + p) * uDotN
@@ -86,17 +97,24 @@ def jacE(WE, n):
     JE = matrixMult(T, L, S)
     return JE
 
-def specRad(WE, n, gamma=1.4):
-    q, p, u, c = gask(WE, gamma)
+def specRad(WE, n):
+    q, p, u, c = gask(WE)
     uDotN = dot_each(u, n) #(u * n).sum(1)
-    cNrmN = c * sqrt( dot_each(n,n) )#sqrt((n**2).sum(1))
+    cNrmN = c * sqrt( dot_each(n,n) )
     return (absolute(uDotN) + cNrmN)
 
-def fluxD(WL, WR, dWL, dWR, n, HiRes=0):
-    assert WL.shape == WR.shape == n.shape[:1] + (4,)
-    A = specRad(0.5 * (WL + WR), n)[:,newaxis]
-    dW = WR - WL
-    flux = -0.5 * dW * A
+def jacSpecRad(WE, n):
+    q, p, u, c = gask(WE)
+    uDotN = (u * n).sum(1)
+    jacQ, jacP, jacU, jacC = jacGask(WE)
+    J_uDotN = (jacU * n[:,:,newaxis]).sum(1)
+    J_cNrmN = jacC * sqrt((n**2).sum(1))[:,newaxis]
+    return sign(uDotN)[:,newaxis] * J_uDotN + J_cNrmN
+
+def fluxD(WE, dW, dWL, dWR, n, HiRes=0):
+    assert WE.shape == dW.shape == n.shape[:1] + (4,)
+    A = specRad(WE, n)[:,newaxis]
+    flux = -0.5 * A * dW
     # minmod type limiter
     if HiRes > 0:
         # remove contribution of dW from cell gradients dWL and dWR,
@@ -107,6 +125,15 @@ def fluxD(WL, WR, dWL, dWR, n, HiRes=0):
         flux += 0.5 * limiter * A * HiRes
     return flux
 
+def jacD(WE, dW, n):
+    # first order, HiRes=0
+    assert WE.shape == n.shape[:1] + (4,)
+    A = specRad(WE, n)
+    jacA = jacSpecRad(WE, n)
+    J_WE = -0.5 * dW[:,:,newaxis] * jacA[:,newaxis,:]
+    J_dW = -0.5 * A[:,newaxis,newaxis] * eye(4)
+    return J_WE, J_dW
+
 def wallBc(W, n):
     assert W.shape == n.shape[:1] + (4,)
     q, p, u, c = gask(W)
@@ -114,9 +141,11 @@ def wallBc(W, n):
     flux[:,1:3] = p[:,newaxis] * n
     return flux
 
-def farBc(W, W0, n):
-    assert W.shape == n.shape[:1] + (4,)
-    return fluxE(W0, W, n) + fluxD(W0, W, 0, 0, n)
+def jacWall(W, n):
+    jacQ, jacP, jacU, jacC = jacGask(W)
+    J = zeros(W.shape[:1] + (4,4))
+    J[:,1:3,:] = jacP[:,newaxis,:] * n[:,:,newaxis]
+    return J
 
 
 class Euler:
@@ -125,18 +154,10 @@ class Euler:
         self.Mach = float(Mach)
         self.HiRes = float(HiRes)
         assert 0 <= self.HiRes <= 1
-        self.ode = ode(lambda t,W: self.ddt(W))
-        self.ode.set_integrator('dopri5', nsteps=10000, rtol=1e-2, atol=1e-5)
+        self.ode = Ode(self.ddt, self.J)
 
-        self.solnLock = threading.Lock()
-
-    def integrate(self, t, W0=None, t0=None):
-        if W0 is not None:
-            if t0 is None: t0 = 0
-            self.ode.set_initial_value(ravel(W0), t0)
-        self.ode.integrate(t)
-        self.setSolnCache(self.time, self.soln)
-        return self.soln
+    def integrate(self, *args, **argv):
+        return self.ode.integrate(*args, **argv)
 
     @property
     def nt(self):
@@ -171,51 +192,117 @@ class Euler:
         gradW = m.gradTri(W)
 
         xt = m.xt()
-        dxt = m.dxt #xt[m.e[:,3],:] - xt[m.e[:,2],:]
-        # interior flux
+        dxt = m.dxt
 
-        #WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
-        WL, WR = m.leftRightTri(W) #abount twice as fast
-
-        #dWL = (gradW[m.e[:,2],:] * dxt[:,:,newaxis]).sum(1)
-        #dWR = (gradW[m.e[:,3],:] * dxt[:,:,newaxis]).sum(1)
-        gWL, gWR = m.leftRightTri(gradW) #about 3 times as fast
-        dWL = einsum( 'nij, ni -> nj', gWL, dxt )
-        dWR = einsum( 'nij, ni -> nj', gWR, dxt )
-
-        flux = fluxE(WL, WR, m.n) + fluxD(WL, WR, dWL, dWR, m.n, self.HiRes)
         # boundary condition categories
         xeBnd = m.v[m.e[m.ieBnd,:2],:].mean(1)
         isWall = ~m.isFar(xeBnd)
+
+        # interior flux
+
+        #WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
+        WL, WR = m.leftRightTri(W)
+        WL[m.ieBnd[~isWall]] = self.freeStream(1)
+
+        WE = 0.5*(WL+WR)
+        dW = WR - WL
+
+        #dWL = (gradW[m.e[:,2],:] * dxt[:,:,newaxis]).sum(1)
+        #dWR = (gradW[m.e[:,3],:] * dxt[:,:,newaxis]).sum(1)
+        gWL, gWR = m.leftRightTri(gradW)
+        dWL = einsum( 'nij, ni -> nj', gWL, dxt )
+        dWR = einsum( 'nij, ni -> nj', gWR, dxt )
+
+        flux = fluxE(WE, m.n) + fluxD(WE, dW, dWL, dWR, m.n, self.HiRes)
+        
         # boundary flux
         WBnd, nBnd = WL[m.ieBnd,:], m.n[m.ieBnd,:]
         flux[m.ieBnd[isWall]] = wallBc(WBnd[isWall,:], nBnd[isWall,:])
-        Wfar = self.freeStream((~isWall).sum())
-        flux[m.ieBnd[~isWall]] = farBc(WBnd[~isWall,:], Wfar, nBnd[~isWall,:])
+        #Wfar = self.freeStream((~isWall).sum())
+        #flux[m.ieBnd[~isWall]] = farBc(WBnd[~isWall,:], Wfar, nBnd[~isWall,:])
         # accumunate flux to cells
         return (m.distributeFlux(flux) / m.a[:,newaxis]).reshape(shp)
 
-    def setSolnCache(self, t, update):
-        'Thread safe method, update the solution copy'
-        self.solnLock.acquire()
-        self._soln_t = t
-        self._soln_copy = update.copy()
-        self.solnLock.release()
+    def J(self, W):
+        if not self.__dict__.has_key('matJacDistFlux'):
+            self.prepareJacMatrices()
+        assert W.size == self.nt * 4
+        shp = W.shape
+        W = W.reshape([-1, 4])
+        m = self.mesh
+        # no limiter yet
+        assert self.HiRes == 0
+        WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
+        isFar = m.isFar(m.v[m.e[m.ieBnd,:2],:].mean(1))
+        WL[m.ieBnd[isFar]] = self.freeStream(1)
+        WE, dW = 0.5 * (WL + WR), WR - WL
+        JE_WE = jacE(WE, m.n)
+        JD_WE, JD_dW = jacD(WE, dW, m.n)
+        # modify for wall BC
+        J_WE = JE_WE + JD_WE
+        ieWall = m.ieBnd[~isFar]
+        J_WE[ieWall,:] = jacWall(WE[ieWall], m.n[ieWall])
+        J_flux = block_diags(J_WE) * self.matJacWE \
+               + block_diags(JD_dW) * self.matJacdW
+        return self.matJacDistFlux * J_flux
 
-    def getSolnCache(self):
-        'Thread safe method, return the previous copy of the solution'
-        self.solnLock.acquire()
-        _soln_t_copy = self._soln_t
-        _soln_copy_copy = self._soln_copy.copy()
-        self.solnLock.release()
-        return _soln_t_copy, _soln_copy_copy
+    def prepareJacMatrices(self):
+        m = self.mesh
+        matL = accumarray(m.e[:,2], m.t.shape[0]).mat.T.tolil()
+        matR = accumarray(m.e[:,3], m.t.shape[0]).mat.T.tolil()
+        # WL on far bc is freestream
+        isFar = m.isFar(m.v[m.e[m.ieBnd,:2],:].mean(1))
+        matL[m.ieBnd[isFar],:] = 0
+        # average and difference
+        self.matJacWE = spkron(0.5 * (matL + matR), eye(4)).tocsr()
+        self.matJacdW = spkron(matR - matL, eye(4)).tocsr()
+        # distribute flux matrix
+        D = block_diags(1./ m.a[:,newaxis,newaxis])
+        self.matJacDistFlux = spkron(D * m.matDistFlux, eye(4)).tocsr()
 
     def metric(self, W=None):
         if W is None: W = self.soln
         gradV = self.mesh.gradTriVrt(W / self.Wref)
-        gradT = self.mesh.gradTri(W / self.Wref)
-        hessian = self.mesh.gradTriVrt(gradT)
-        hessian += hessian.transpose([0,2,1,3])
-        # return (hessian + gradV[:,newaxis,:,:] * gradV[:,:,newaxis,:]).sum(-1)
-        return hessian.sum(-1)
+        # weight by entropy adjoint
+        q, p, u, c = gask(W)
+        V = hstack([q[:,newaxis], W[:,1:3], W[:,:1]]) * self.Wref
+        gradV *= self.mesh.interpTri2Vrt(V)[:,newaxis,:]
+        return (gradV[:,newaxis,:,:] * gradV[:,:,newaxis,:]).sum(-1)
+        # return hessian.sum(-1)
 
+    def checkJacobian(self):
+        '''
+        Generate a flow with small linear variation (supress numerical diss.),
+        check adjoint ddt vs Euler ddt
+        '''
+        xt = self.mesh.xt()
+        R = 0.2 * self.mesh.diameter()
+        decay = exp(-(xt**2).sum(1) / R**2)[:,newaxis]
+        nT = self.mesh.t.shape[0]
+        # random flow field
+        variation = 0.1 * (random.rand(nT, 4) - 0.5)
+        W0 = self.freeStream() + self.Wref * variation
+        # random perturbation
+        EPS = 0.000001
+        variation = EPS * (random.rand(nT, 4) - 0.5)
+        W1 = W0 + self.Wref * variation
+        # compare ddt with Jacobian
+        deltaFD = self.ddt(ravel(W1)) - self.ddt(ravel(W0))
+        deltaJac = self.J(0.5 * (W0 + W1)) * ravel(W1 - W0)
+        # difference
+        print sqrt(((deltaFD - deltaJac)**2).sum()), \
+              sqrt((deltaJac**2).sum()), sqrt((deltaFD**2).sum())
+
+
+if __name__ == '__main__':
+    geom = loadtxt('../data/n0012c.dat')
+    geom = rotate(geom, 10*pi/180)
+    nE = 1000
+    dt = 0.0001
+    Mach = 4.0
+    HiRes = 0.0
+    
+    v, t, b = initMesh(geom, nE)
+    solver = Euler(v, t, b, Mach, HiRes)
+    for i in range(8):
+        solver.checkJacobian()
