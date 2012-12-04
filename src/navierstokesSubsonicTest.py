@@ -12,9 +12,9 @@ from navierstokes import *
 geom = rotate(loadtxt('../data/n0012c.dat'), 30*pi/180)
 # geom = transpose([cos(linspace(0,2*pi,33)), sin(linspace(0,2*pi,33))])
 # geom[-1] = geom[0]
-nE = 5000
+nE = 1500
 dt = 0.001
-nsteps = 25
+nsteps = 5
 Mach = 0.3
 Re = 10000
 HiRes = 1.
@@ -23,7 +23,7 @@ diameter = 3
 if not os.path.exists('fig'): os.mkdir('fig')
 if not os.path.exists('data'): os.mkdir('data')
 
-for iAdapt in range(20):
+for iAdapt in range(1):
     print 'Adapt cycle {0}'.format(iAdapt)
     
     if iAdapt == 0:

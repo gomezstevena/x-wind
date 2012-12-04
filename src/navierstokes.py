@@ -76,10 +76,11 @@ class NavierStokes(Euler):
         ddtVisc = (m.distributeFlux(flux) / m.a[:,newaxis]).reshape(shp)
         return ddtEuler + ddtVisc
 
+    #@profile
     def J(self, W):
         if not self.__dict__.has_key('matGradU'):
             self.prepareJacMatricesVisc()
-        ddtEuler = Euler.ddt(self, W)
+        #ddtEuler = Euler.ddt(self, W)
         # Navier Stokes terms
         assert W.size == self.nt * 4
         shp = W.shape

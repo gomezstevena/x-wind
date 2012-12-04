@@ -2,6 +2,7 @@ from numpy import *
 import scipy.sparse
 from scipy.sparse import linalg as splinalg
 
+
 class Ode:
     def __init__(self, ddt, J, tol=1E-5, dt0=1E-4, dtMax=0.1):
         self.ddt = ddt
@@ -43,7 +44,13 @@ class Ode:
                 if resNorm < 1E-9 or resNorm < self.tol or i >= nIterMax:
                     nIter = i + 1
                     break
-                self.y -= splinalg.spsolve(self.I - a * J, res)
+
+                tmp = self.I - a*J;
+
+                #dy = splinalg.spsolve(tmp, res)
+                dy, err = splinalg.gmres( tmp, res, tol=1e-6)
+                self.y -= dy
+
             if nIter > nIterMax:
                 self.t = t0
                 self.y[:] = self.y0[:]
