@@ -7,15 +7,21 @@ from scipy.interpolate import griddata
 
 from mesh import *
 
+from IPython import embed
 
 def gask(W, gamma=1.4):
     '''
     Returns kinetic energy q, pressure p, velocity u and sound speed c
     '''
     u = W[:,1:3] / W[:,:1]           # velocity
-    q = 0.5 * W[:,0] * sum(u**2,1)   # kinetic energy
-    p = (W[:,3] - q) * (gamma - 1)   # pressure
-    c = sqrt(gamma * p / W[:,0])     # speed of sound
+
+    #q = 0.5 * W[:,0] * sum(u**2,1)   # kinetic energy
+    q = einsum('ni, ni -> n', u, u); q *= W[:,0]; q*= 0.5; #almost twice as fast
+
+    p = (W[:,3] - q); p *= (gamma - 1)   # pressure
+
+    #c = sqrt(gamma * p / W[:,0] )     # speed of sound
+    c = p/W[:,0]; c*=gamma; sqrt(c, out=c)
     return q, p, u, c
 
 def jacConsSym(W, n=None, gamma=1.4):
@@ -135,7 +141,7 @@ class Euler:
 
     @property
     def nt(self):
-        return self.mesh.t.shape[0]
+        return self.mesh.nt
 
     @property
     def time(self):
@@ -164,12 +170,20 @@ class Euler:
         W = W.reshape([-1, 4])
         m = self.mesh
         gradW = m.gradTri(W)
+
         xt = m.xt()
-        dxt = xt[m.e[:,3],:] - xt[m.e[:,2],:]
+        dxt = m.dxt #xt[m.e[:,3],:] - xt[m.e[:,2],:]
         # interior flux
-        WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
-        dWL = (gradW[m.e[:,2],:] * dxt[:,:,newaxis]).sum(1)
-        dWR = (gradW[m.e[:,3],:] * dxt[:,:,newaxis]).sum(1)
+
+        #WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
+        WL, WR = m.leftRightTri(W) #abount twice as fast
+
+        #dWL = (gradW[m.e[:,2],:] * dxt[:,:,newaxis]).sum(1)
+        #dWR = (gradW[m.e[:,3],:] * dxt[:,:,newaxis]).sum(1)
+
+        gWL, gWR = m.leftRightTri(gradW) #about 3 times as fast
+        dWL = einsum( 'nij, ni -> nj', gWL, dxt )
+        dWR = einsum( 'nij, ni -> nj', gWR, dxt )
 
         #embed()
 

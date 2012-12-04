@@ -106,8 +106,6 @@ class Mesh:
         self.a = triArea(v, t)
         self.n = edgNormal(v, self.e)
 
-        self.ne = self.e.shape[0]
-        self.nt = self.t.shape[0]
 
         self.ieBnd = (self.e[:,3] == self.e[:,2]).nonzero()[0]
 
@@ -123,11 +121,22 @@ class Mesh:
 
         self.edgeMean = edgeMeanMapT.transpose().tocsr()
 
+        self.leftMap  = accumarray(self.e[:,2]).mat.transpose().tocsr()
+        self.rightMap = accumarray(self.e[:,3]).mat.transpose().tocsr()
+
+        ## X-location of each triangle center
+        self._xt = self.v[self.t,:].mean(1)
+
+        self._dxt = self._xt[self.e[:,3],:] - self._xt[self.e[:,2],:]
 
 
     @property
     def nt(self):
         return self.t.shape[0]
+
+    @property
+    def ne(self):
+        return self.e.shape[0]
 
     def center(self):
         '0.5 * (v.min(0) + v.max(0))'
@@ -150,8 +159,29 @@ class Mesh:
         ieInterior = (e[:,2] != e[:,3])
         assert ((dxt2e * n).sum(1)[ieInterior] < 0).all()
 
+    
     def xt(self):
-        return self.v[self.t,:].mean(1)
+        return self._xt #v[self.t,:].mean(1)
+    
+    @property
+    def dxt(self):
+        return self._dxt
+
+    def leftRightTri(self, W):
+        '''
+        Input: W values on triangle shape:(nt, vshape)
+        Output: W value on (left, right) of each edge (ne, vshape), (ne, vshape)
+        '''
+        vshape = W.shape[1:]
+        out_shape = (self.ne,) + vshape
+
+        Wf = W.reshape( (self.nt, -1) )
+        
+        WL = reshape(self.leftMap * Wf, out_shape)
+        WR =  reshape(self.rightMap * Wf, out_shape)
+
+        return WL, WR
+
 
     def plotMesh(self, detail=0, alpha=1):
         '''
