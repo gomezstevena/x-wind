@@ -23,7 +23,7 @@ def gradTri(mesh, phi, phiBc):
     Input: scalar field phi of shape (nt,m) defined on triangles
     Output: vector field gradPhi of shape (nt,2,m) defined on triangles
     '''
-    assert phi.shape[0] == mesh.t.shape[0]
+    assert phi.shape[0] == mesh.nt
     # edge gradient for each triangle
     gradEdg = gradTriEdg(mesh, phi, phiBc)
     # average of edge gradients
@@ -35,13 +35,49 @@ def edgeToTri(mesh, edgVal):
     Input: values on cell edges shape:(ne, val_shape )
     Output: values on triangles from the mean of value on each edge shape:(nt, val_shape)
     '''
-    val_shape = edgVal.shape[1:]
-    val_flat = edgVal.reshape( (mesh.ne, -1) ) #required for using sparse matrix multiply
+    triVal = mesh.edgeMean * edgVal.reshape( (mesh.ne, -1) )
+    return triVal.reshape( (-1,) + edgVal.shape[1:] )
 
-    triVal = mesh.edgeMean * val_flat
-    triVal = triVal.reshape( (-1,) + val_shape )
+def leftRightTri(mesh, W):
+    '''
+    Input: W values on triangles, shape:(nt, vshape)
+    Output: W value on (left, right) of each edge, shapes: (ne, vshape), (ne, vshape)
+    '''
+    Wf = W.reshape( (mesh.nt, -1) )
+    Wlr = mesh.lr_map * Wf
+    Wlr.shape = (2*mesh.ne,) + W.shape[1:]
+    return Wlr[:mesh.ne], Wlr[mesh.ne:]
 
-    return triVal
+def leftTri(mesh, W):
+    '''
+    Input: W values on triangles, shape:(nt, vshape)
+    Output: W value on left of each edge, shape:(ne, vshape)
+    '''
+    Wf = W.reshape( (mesh.nt, -1) )
+    WL = mesh.l_map * Wf
+    WL.shape = (mesh.ne,) + W.shape[1:]
+    return WL
+
+def rightTri(mesh, W):
+    '''
+    Input: W values on triangles, shape:(nt, vshape)
+    Output: W value on right of each edge, shape:(ne, vshape)
+    '''
+    Wf = W.reshape( (mesh.nt, -1) )
+    WR = mesh.r_map * Wf
+    WR.shape = (mesh.ne,) + W.shape[1:]
+    return WR
+
+def triToEdge(mesh, W):
+    '''
+    Input:  W values on triangles, shape:(nt, vshape)
+    Output: WE value on each edge, shape:(ne, vshape)
+    '''
+    Wf = W.reshape( (mesh.nt, -1) )
+
+    Wlr = mesh.lr_map * Wf
+    Wlr.shape = (2, mesh.ne,) + W.shape[1:]
+    return Wlr.mean(0)
 
 def gradTriVrt(mesh, phi, phiBc):
     '''

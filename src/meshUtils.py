@@ -43,6 +43,9 @@ def indexMap(indx, n = None, weight = 1):
 def dot_each(a, b):
     return einsum('ni, ni -> n', a, b)
 
+def dot_all(a, b):
+    return dot( a.ravel(), b.ravel() )
+
 def invertMap(m):
     '''
     Input m is an (ni, nj) array that maps

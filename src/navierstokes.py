@@ -33,21 +33,28 @@ def jacV(UE, gradUE, n):
     assert gradUE.shape == n.shape[:1] + (2,2)
     # original flux
     flux = zeros([gradUE.shape[0], 4])
-    f1 = (gradUE * n[:,:,newaxis]).sum(1) \
-       + (gradUE * n[:,newaxis,:]).sum(2)
-    f2 = gradUE[:,[0,1],[0,1]].sum(1)[:,newaxis] * n
+    #f1 = (gradUE * n[:,:,newaxis]).sum(1) + (gradUE * n[:,newaxis,:]).sum(2)
+    f1 = einsum('nij,ni->nj', gradUE, n) + einsum('nij,nj->ni', gradUE, n)
+    f2 = n * einsum('nii', gradUE)[:,newaxis]
+
     # momentum viscous flux
     flux[:,1:3] = -f1 + 2/3. * f2
     # start Jacobian
     fluxJ_UE = zeros(n.shape[:1] + (4,2))
     fluxJ_gradUE = zeros(n.shape[:1] + (4,2,2))
-    f1Jac = n[:,newaxis,:,newaxis] * eye(2)[newaxis,:,newaxis,:] \
-          + n[:,newaxis,newaxis,:] * eye(2)[newaxis,:,:,newaxis]
-    f2Jac = n[:,:,newaxis,newaxis] * eye(2)[newaxis,newaxis,:,:]
+
+    I2 = eye(2)
+    #f1Jac = n[:,newaxis,:,newaxis] * I2[newaxis,:,newaxis,:] \
+    #        + n[:,newaxis,newaxis,:] * I2[newaxis,:,:,newaxis]
+    f1Jac = einsum('ni,jk->njik', n, I2) + einsum('ni,jk->njki', n, I2)
+    #f2Jac = n[:,:,newaxis,newaxis] * I2[newaxis,newaxis,:,:]
+    f2Jac = einsum('ni,jk->nijk', n, I2)
+
     # momentum viscous flux
     fluxJ_gradUE[:,1:3] = -f1Jac + 2/3. * f2Jac
     # energy viscous flux, ignore conduction
-    fluxJ_gradUE[:,3] = (fluxJ_gradUE[:,1:3] * UE[:,:,newaxis,newaxis]).sum(1)
+    #fluxJ_gradUE[:,3] = (fluxJ_gradUE[:,1:3] * UE[:,:,newaxis,newaxis]).sum(1)
+    fluxJ_gradUE[:,3] = einsum('nijk,ni->njk', fluxJ_gradUE[:,1:3], UE)
     fluxJ_UE[:,3] = flux[:,1:3]
     return fluxJ_UE, fluxJ_gradUE
 
@@ -73,10 +80,10 @@ class NavierStokes(Euler):
         ieFar = m.ieBnd[isFar]
         uBc[isFar,:] = u[m.e[ieFar,3],:]
         # compute and accumulate viscous flux
-        uE = 0.5 * (u[m.e[:,2],:] + u[m.e[:,3],:])
+        uE = m.triToEdge(u)#0.5 * (u[m.e[:,2],:] + u[m.e[:,3],:])
         graduE = m.gradTriEdg(u, uBc)
         flux = self.mu * fluxV(uE, graduE, m.n)
-        ddtVisc = (m.distributeFlux(flux) / m.a[:,newaxis]).reshape(shp)
+        ddtVisc = ( m.distributeFlux(flux) / m.a[:,newaxis] ).reshape(shp)
         return ddtEuler + ddtVisc
 
     #@profile
@@ -97,10 +104,10 @@ class NavierStokes(Euler):
         ieFar = m.ieBnd[isFar]
         uBc[isFar,:] = u[m.e[ieFar,3],:]
         # compute uE and graduE
-        uE = 0.5 * (u[m.e[:,2],:] + u[m.e[:,3],:])
+        uE = m.triToEdge(u)#0.5 * (u[m.e[:,2],:] + u[m.e[:,3],:])
         graduE = m.gradTriEdg(u, uBc)
         # Before are same as in ddt. now Jacobian computation
-        nE, nT = m.e.shape[0], m.t.shape[0]
+        nE, nT = m.ne, m.nt
         jacW2U = zeros([nT, 2, 4])
         jacW2U[:,[0,1],[1,2]] = 1./ W[:,:1]
         jacW2U[:,:,0] = -u / W[:,:1]
@@ -109,9 +116,8 @@ class NavierStokes(Euler):
         fluxJ_UE = block_diags(self.mu * fluxJ_UE.reshape((-1,4,2)))
         fluxJ_gradUE = block_diags(self.mu * fluxJ_gradUE.reshape((-1,4,4)))
         #embed()
-        J_flux = fluxJ_UE * self.matJacUE * jacW2U \
-               + fluxJ_gradUE * self.matGradU * jacW2U
-        return Euler.J(self, W) + self.matJacDistFlux * J_flux
+        J_flux = (fluxJ_UE*self.matJacUE + fluxJ_gradUE*self.matGradU)*jacW2U
+        return Euler.J(self, W) + self.matJacDistFlux*J_flux
 
     def J_Oper(self, W ):
         if not self.__dict__.has_key('matGradU'):

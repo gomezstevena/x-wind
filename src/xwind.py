@@ -38,7 +38,7 @@ class SolverGuiCoupler:
 
         self.Mach = 0.5
         self.Re = inf #12800
-        self.nE = 250
+        self.nE = 845 #250
         self.geom = rotate(loadtxt('../data/n0012c.dat'), .5)
         # self.geom = rotate(loadtxt('../data/default.dat'), 0)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
@@ -54,6 +54,7 @@ class SolverGuiCoupler:
         self.solnLock = threading.Lock()
         c, d = centerDiameter(self.geom)
         self.dt = 0.02 * d / 300.
+        self.dt *= 10
         nV = self.solver.mesh.v.shape[0]
         self.metric = zeros([nV, 2, 2]) # metric for adaptation
         self.solutionList = []

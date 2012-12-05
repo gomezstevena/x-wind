@@ -123,9 +123,9 @@ class Mesh:
         self.edgeMean.prune()
 
 
-        self.lmap = indexMap(self.e[:,2], self.nt)
-        self.rmap = indexMap(self.e[:,3], self.nt)
-        self.lr_map = sparse.vstack([self.lmap, self.rmap], format='csr')
+        self.l_map = indexMap(self.e[:,2], self.nt)
+        self.r_map = indexMap(self.e[:,3], self.nt)
+        self.lr_map = sparse.vstack([self.l_map, self.r_map], format='csr')
 
         ## X-location of each triangle center
         self._xt = self.v[self.t,:].mean(1)
@@ -172,16 +172,12 @@ class Mesh:
     def dxt(self):
         return self._dxt
 
-    def leftRightTri(self, W):
-        '''
-        Input: W values on triangle shape:(nt, vshape)
-        Output: W value on (left, right) of each edge (ne, vshape), (ne, vshape)
-        '''
-        Wf = W.reshape( (self.nt, -1) )
-
-        Wlr = self.lr_map * Wf
-        Wlr.shape = (2*self.ne,) + W.shape[1:]
-        return Wlr[:self.ne], Wlr[self.ne:]
+    
+    leftRightTri = _grad.leftRightTri
+    leftTri = _grad.leftTri
+    rightTri = _grad.rightTri
+    triToEdge = _grad.triToEdge
+    edgeToTri = _grad.edgeToTri
 
     # -------------- plotting ---------------- #
     def plotMesh(self, detail=0, alpha=1):
@@ -256,8 +252,9 @@ class Mesh:
     def interpTri2Vrt(self, phi):
         return _grad.interpTri2Vrt(self, phi)
 
+    '''
     def interpTri2Edg(self, phi, isAdjoint=False):
-        return _grad.interpTri2Edg(self, phi, isAdjoint)
+        return _grad.interpTri2Edg(self, phi, isAdjoint)'''
 
 if __name__ == '__main__':
     v, t, b = initMesh( \
