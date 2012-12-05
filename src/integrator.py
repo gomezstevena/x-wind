@@ -2,9 +2,10 @@ from numpy import *
 import scipy.sparse
 from scipy.sparse import linalg as splinalg
 
+#from IPython import embed
 
 class Ode:
-    def __init__(self, ddt, J, tol=1E-5, dt0=1E-4, dtMax=0.1):
+    def __init__(self, ddt, J, tol=1E-5, dt0=1E-4, dtMax=0.1 ):
         self.ddt = ddt
         self.J = J
         self.tol = tol
@@ -34,7 +35,9 @@ class Ode:
             # newton iteration
             nIterMin, nIterMax = 4, 8
             for i in range(10):
-                dydt, J = self.ddt(self.y), self.J(self.y)
+                dydt = self.ddt(self.y)
+                J = self.J(self.y)
+
                 if not isfinite(dydt).all():
                     nIter = nIterMax + 1
                     break
@@ -46,8 +49,7 @@ class Ode:
                     break
 
                 tmp = self.I - a*J;
-                #dy = splinalg.spsolve(tmp, res)
-                dy, err = splinalg.gmres( tmp, res, tol=1e-6)
+                dy, err = splinalg.gmres( tmp, res, tol=self.tol)
                 self.y -= dy
 
             if nIter > nIterMax:

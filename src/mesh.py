@@ -109,7 +109,6 @@ class Mesh:
         self.ieBnd = (self.e[:,3] == self.e[:,2]).nonzero()[0]
 
 
-
         self.edgOfTri = invertMap(self.e[:,2:])[1].reshape([-1, 3])
 
 

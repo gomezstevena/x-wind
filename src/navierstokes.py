@@ -7,6 +7,8 @@ from scipy.sparse import linalg as splinalg
 from mesh import *
 from euler import *
 
+#from IPython import embed
+
 def fluxV(UE, gradUE, n):
     '''
     Viscous flux in NS equation
@@ -106,6 +108,7 @@ class NavierStokes(Euler):
         fluxJ_UE, fluxJ_gradUE = jacV(uE, graduE, m.n)
         fluxJ_UE = block_diags(self.mu * fluxJ_UE.reshape((-1,4,2)))
         fluxJ_gradUE = block_diags(self.mu * fluxJ_gradUE.reshape((-1,4,4)))
+        #embed()
         J_flux = fluxJ_UE * self.matJacUE * jacW2U \
                + fluxJ_gradUE * self.matGradU * jacW2U
         return Euler.J(self, W) + self.matJacDistFlux * J_flux
@@ -142,17 +145,17 @@ class NavierStokes(Euler):
         EJ = Euler.J(self, W)
 
 
-        def matvec(self, X):
+        def matvec(X):
 
             out = EJ*X
             JW2_X = jacW2U * X
-            #JFlux_X = 
+            JFlux_X = fluxJ_UE * (self.matJacUE * JW2_X)
+            JFlux_X += fluxJ_gradUE * (self.matGradU * JW2_X)
             out += self.matJacDistFlux * JFlux_X
+            return out
 
 
-        return None
-
-
+        return matvec
 
 
     def prepareJacMatricesVisc(self):
