@@ -1,18 +1,17 @@
 from numpy import *
 import scipy.sparse
 from scipy.sparse import linalg as splinalg
-
+from util import *
 #from IPython import embed
 
 class Ode:
-    def __init__(self, ddt, J, tol=1E-5, dt0=1E-3, dtMax=0.1 ):
+    def __init__(self, ddt, J, tol=1E-5, dt0=1E-3, dtMax=0.1):
         self.ddt = ddt
         self.J = J
         self.tol = tol
         self.dt = dt0
         self.dtMax = dtMax
 
-    #@profile
     def integrate(self, t, y0=None, t0=None):
         if y0 is not None:
             # set initial condition
@@ -34,7 +33,7 @@ class Ode:
             b00 = -1 / max(3., dt0 * (dt0 + 2 * dt) / dt**2)
             a, b0 = dt + b00 * dt0, 1 - b00
             # newton iteration
-            nIterMin, nIterMax = 5, 12
+            nIterMin, nIterMax = 4, 10
             for i in range(nIterMax+1):
                 dydt = self.ddt(self.y)
 
@@ -43,8 +42,8 @@ class Ode:
                     nIter = nIterMax + 1
                     break
                 res = self.y - b0 * self.y0 - b00 * self.y00 - a * dydt
-                resNorm = sqrt( (res**2).sum() / (self.y**2).sum() )
-                #print 'iter {0} with dt={1}, res={2}'.format(i, dt, resNorm)
+                resNorm = sqrt((res**2).sum() / (self.y**2).sum())
+                print 'iter {0} with dt={1}, res={2}'.format(i, dt, resNorm)
                 if resNorm < 1E-9 or resNorm < self.tol or i >= nIterMax:
                     nIter = i + 1
                     break
@@ -52,7 +51,7 @@ class Ode:
                 J = self.J(self.y)
 
                 tmp = self.I - a*J;
-                dy, err = splinalg.gmres( tmp, res, tol=self.tol)
+                dy, err = splinalg.gmres( tmp, res , maxiter=10)
                 self.y -= dy
 
             if nIter > nIterMax:
@@ -68,11 +67,8 @@ class Ode:
                     self.dt = min(self.dtMax, max(dt, self.dt / 0.8))
         return self.y
 
-def dot_all(a,b):
-    return dot(a.ravel(), b.ravel() )
 
-def nnorm(a):
-    return dot(a.ravel(), a.ravel())
+from sys import stdout
 
 class CrankNicolson(Ode):
 
@@ -87,20 +83,23 @@ class CrankNicolson(Ode):
             self.I = scipy.sparse.eye(self.y.size, self.y.size)
             if t0 is None: t0 = 0.0
             self.t = t0
+            self.dt0 = self.dt
 
         t0 = self.t
-        assert self.t < t
+        #self.dt = max(self.dt, self.dt0)
+
+        sub_steps = 0
         while self.t < t:
             pct_to_go = (self.t - t0)/(t-t0) * 100
-            print '{0}%: t = {1}'.format(pct_to_go, self.t )
+            stdout.write( '\r{0}%: t = {1:0.4g}'.format(pct_to_go, self.t ) ); stdout.flush()
 
-            self.dt = min( t-self.t, self.dt ) #agressive
+            dt = min( t-self.t, self.dt ) #agressive
 
             self.f0 = self.ddt(self.y0)
-            self.y = self.guess_step(self.dt)
+            #self.y = self.guess_step(self.dt)
 
 
-            nIterMin, nIterMax = 4, 15
+            nIterMin, nIterMax = 3, 15
             for nIter in xrange(nIterMax+1):
                 
                 if not isfinite(self.f0).all():
@@ -108,29 +107,36 @@ class CrankNicolson(Ode):
                     break
 
                 f = self.ddt(self.y)
-                res = (self.y - self.y0) - (.5*self.dt)*( self.f0 + f )
+                res = (self.y - self.y0) - (.5*dt)*( self.f0 + f )
                 resNorm = sqrt( nnorm(res)/nnorm(self.y)  )
-                #print '{0}: with dt={1}, res={2}'.format(nIter, self.dt, resNorm)
+                #stdout.write( '{0}: with dt={1}, res={2}\n'.format(nIter, dt, resNorm) ); stdout.flush()
                 if resNorm < 1E-9 or resNorm < self.tol or nIter >= nIterMax:
                     break
 
                 J = self.J(self.y)
 
-                dRdu = self.I - (self.dt/2)*J
+                dRdu = self.I - (dt/2)*J
 
-                dy, err = splinalg.gmres( dRdu, res, x0 = self.dt*self.f0, tol=self.tol)
+                dy, err = splinalg.gmres( dRdu, res, x0 = dt*self.f0, tol=self.tol, maxiter = 10)
                 self.y -= dy
 
             if nIter >= nIterMax:
-                self.y[:] = self.guess_step(self.dt)
-                self.dt *= 0.75
-                print 'bad, dt =', self.dt
+                self.y[:] = self.guess_step(dt)
+                self.dt *= 0.5
+                print 'bad, dt =', dt, self.dt
             else:
-                self.t += self.dt
+                self.t += dt
                 self.y0[:] = self.y
                 self.f0 = f 
-                if nIter < nIterMin:
-                    self.dt = min(self.dtMax, self.dt / 0.9)
+                sub_steps += 1
+                if nIter < nIterMin and dt == self.dt:
+                    self.dt = min(self.dtMax, max(dt, self.dt / 0.8) )
 
-        print 'Went from {0} to {1}'.format(t0, self.t)
+                #stdout.write('\nnIters = {0}, dt_new = {1}\n'.format(nIter, self.dt) ); stdout.flush()
+
+
+
+        pct_to_go = (self.t - t0)/(t-t0) * 100
+        print '\r{0}%: t = {1:0.4g}'.format(pct_to_go, self.t ),
+        print ': went total_step = {0:.3g} in {1} steps'.format(self.t-t0, sub_steps)
         return self.y

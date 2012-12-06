@@ -93,15 +93,6 @@ def edgNormal(v, e):
     dp[:,1] *= -1
     return dp[:,[1,0]]
 
-def accum_slow(inds, vals):
-    assert len(inds) == len(vals)
-    M = inds.max() + 1
-    A = zeros(M)
-    for i in xrange(len(inds)):
-        A[ inds[i] ] += vals[i]
-
-    return A
-
 if __name__ == '__main__':
     n = 25
     indx = randint(n, size=100)

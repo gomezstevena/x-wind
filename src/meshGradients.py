@@ -109,7 +109,7 @@ def gradTriEdg(mesh, phi, phiBc):
     elif type(phiBc) is not ndarray:
         phiBc = ones(mesh.b.shape[0]) * phiBc
     assert phi.shape[0] == mesh.t.shape[0]
-    assert phiBc.shape[0] == mesh.b.shape[0]
+    assert phiBc.shape[0] == mesh.ieBnd.size
     shape = phi.shape[1:]
     phi = phi.reshape(phi.shape[:1] + (-1,))
     phiBc = phiBc.reshape(phiBc.shape[:1] + (-1,))

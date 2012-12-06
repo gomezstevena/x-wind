@@ -4,7 +4,7 @@ from numpy import *
 from scipy.sparse import kron as spkron
 
 from mesh import *
-from integrator import Ode
+from integrator import Ode, CrankNicolson
 
 def gask(W, gamma=1.4):
     '''
@@ -84,7 +84,7 @@ def jacConsSym(W, n=None, gamma=1.4):
 def fluxE(WE, n):
     assert WE.shape == n.shape[:1] + (4,)
     q, p, u, c = gask(WE)
-    uDotN = dot_each(u, n) #(u * n).sum(1)
+    uDotN = dot_each(u, n)
     flux = zeros(WE.shape)
     flux[:,0] = WE[:,0] * uDotN
     flux[:,1:3] = WE[:,1:3] * uDotN[:,newaxis] + p[:,newaxis] * n
@@ -101,7 +101,7 @@ def specRad(WE, n):
     q, p, u, c = gask(WE)
     uDotN = dot_each(u, n) #(u * n).sum(1)
     cNrmN = c * sqrt( dot_each(n,n) )
-    return (absolute(uDotN) + cNrmN)
+    return (abs(uDotN) + cNrmN)
 
 def jacSpecRad(WE, n):
     q, p, u, c = gask(WE)
@@ -111,28 +111,23 @@ def jacSpecRad(WE, n):
     J_cNrmN = jacC * sqrt((n**2).sum(1))[:,newaxis]
     return sign(uDotN)[:,newaxis] * J_uDotN + J_cNrmN
 
-def fluxD(WE, dW, dWL, dWR, n, HiRes=0):
+def fluxD(WE, dW, dWL, dWR, n):
     assert WE.shape == dW.shape == n.shape[:1] + (4,)
     A = specRad(WE, n)[:,newaxis]
     flux = -0.5 * A * dW
-    # minmod type limiter
-    if HiRes > 0:
-        # remove contribution of dW from cell gradients dWL and dWR,
-        # which are computed as averages of edge gradients
-        dWL, dWR = 1.5 * dWL - 0.5 * dW, 1.5 * dWR - 0.5 * dW
-        limSign = (dWL * dW > 0) * (dWR * dW > 0) * sign(dW)
-        limiter = limSign * minimum(absolute(dW), minimum(absolute(dWR), absolute(dWL)))
-        flux += 0.5 * limiter * A * HiRes
+    flux += 0.25 * A * (dWR + dWL)
     return flux
 
-def jacD(WE, dW, n):
-    # first order, HiRes=0
+def jacD(WE, dW, dWL, dWR, n):
     assert WE.shape == n.shape[:1] + (4,)
     A = specRad(WE, n)
     jacA = jacSpecRad(WE, n)
     J_WE = -0.5 * dW[:,:,newaxis] * jacA[:,newaxis,:]
+    J_WE += 0.25 * (dWL + dWR)[:,:,newaxis] * jacA[:,newaxis,:]
     J_dW = -0.5 * A[:,newaxis,newaxis] * eye(4)
-    return J_WE, J_dW
+    J_dWL = 0.25 * A[:,newaxis,newaxis] * eye(4)
+    J_dWR = 0.25 * A[:,newaxis,newaxis] * eye(4)
+    return J_WE, J_dW, J_dWL, J_dWR
 
 def wallBc(W, n):
     assert W.shape == n.shape[:1] + (4,)
@@ -149,11 +144,9 @@ def jacWall(W, n):
 
 
 class Euler:
-    def __init__(self, v, t, b, Mach, HiRes=.9):
+    def __init__(self, v, t, b, Mach):
         self.mesh = Mesh(v, t, b)
         self.Mach = float(Mach)
-        self.HiRes = float(HiRes)
-        assert 0 <= self.HiRes <= 1
         self.ode = Ode(self.ddt, self.J)
 
     def integrate(self, *args, **argv):
@@ -213,13 +206,11 @@ class Euler:
         dWL = einsum( 'nij, ni -> nj', gWL, dxt )
         dWR = einsum( 'nij, ni -> nj', gWR, dxt )
 
-        flux = fluxE(WE, m.n) + fluxD(WE, dW, dWL, dWR, m.n, self.HiRes)
+        flux = fluxE(WE, m.n) + fluxD(WE, dW, dWL, dWR, m.n)
         
         # boundary flux
         WBnd, nBnd = WL[m.ieBnd,:], m.n[m.ieBnd,:]
         flux[m.ieBnd[isWall]] = wallBc(WBnd[isWall,:], nBnd[isWall,:])
-        #Wfar = self.freeStream((~isWall).sum())
-        #flux[m.ieBnd[~isWall]] = farBc(WBnd[~isWall,:], Wfar, nBnd[~isWall,:])
         # accumunate flux to cells
         return (m.distributeFlux(flux) / m.a[:,newaxis]).reshape(shp)
 
@@ -230,20 +221,29 @@ class Euler:
         shp = W.shape
         W = W.reshape([-1, 4])
         m = self.mesh
-        # no limiter yet
-        # assert self.HiRes == 0
-        WL, WR = W[m.e[:,2],:], W[m.e[:,3],:]
+        # prepare values at edge
+        gradW = m.gradTri(W)
+        xt = m.xt(); 
+        dxt = m.dxt
+        WL, WR = m.leftRightTri(W)
         isFar = m.isFar(m.v[m.e[m.ieBnd,:2],:].mean(1))
         WL[m.ieBnd[isFar]] = self.freeStream(1)
         WE, dW = 0.5 * (WL + WR), WR - WL
         JE_WE = jacE(WE, m.n)
-        JD_WE, JD_dW = jacD(WE, dW, m.n)
+
+        gWL, gWR = m.leftRightTri(gradW)
+        dWL = einsum( 'nij, ni -> nj', gWL, dxt )
+        dWR = einsum( 'nij, ni -> nj', gWR, dxt )
+
+        JD_WE, JD_dW, JD_dWL, JD_dWR  = jacD(WE, dW, dWL, dWR, m.n)
         # modify for wall BC
         J_WE = JE_WE + JD_WE
         ieWall = m.ieBnd[~isFar]
         J_WE[ieWall,:] = jacWall(WE[ieWall], m.n[ieWall])
         J_flux = block_diags(J_WE) * self.matJacWE \
-               + block_diags(JD_dW) * self.matJacdW
+               + block_diags(JD_dW) * self.matJacdW \
+               + block_diags(JD_dWL) * self.matJacdWL \
+               + block_diags(JD_dWR) * self.matJacdWR
         return self.matJacDistFlux * J_flux
 
     def prepareJacMatrices(self):
@@ -254,19 +254,34 @@ class Euler:
         isFar = m.isFar(m.v[m.e[m.ieBnd,:2],:].mean(1))
         matL[m.ieBnd[isFar],:] = 0
         # average and difference
+        self.matJacWL = spkron(matL, eye(4)).tocsr()
+        self.matJacWR = spkron(matR, eye(4)).tocsr()
         self.matJacWE = spkron(0.5 * (matL + matR), eye(4)).tocsr()
         self.matJacdW = spkron(matR - matL, eye(4)).tocsr()
         # distribute flux matrix
         D = block_diags(1./ m.a[:,newaxis,newaxis])
         self.matJacDistFlux = spkron(D * m.matDistFlux, eye(4)).tocsr()
+        # Tri to edg gradient with boundary copy
+        matTriToBnd = accumarray(m.e[m.ieBnd,2], m.t.shape[0]).mat.T
+        matGradTriEdg = m.matGradTriEdg + m.bcmatGradTriEdg * matTriToBnd
+        # left and right gradient in cells
+        edgOfTri = invertMap(m.e[:,2:])[1].reshape([-1, 3])
+        avgEdgToTri = (accumarray(edgOfTri[:,0], m.e.shape[0]).mat.T + \
+                       accumarray(edgOfTri[:,1], m.e.shape[0]).mat.T + \
+                       accumarray(edgOfTri[:,2], m.e.shape[0]).mat.T) / 3.
+        matGradTri = spkron(avgEdgToTri, eye(2)) * matGradTriEdg
+        xt = m.xt(); dxt = xt[m.e[:,3],:] - xt[m.e[:,2],:]
+        matL = spkron(accumarray(m.e[:,2], m.t.shape[0]).mat.T, eye(2))
+        matR = spkron(accumarray(m.e[:,3], m.t.shape[0]).mat.T, eye(2))
+        matJacdWL = block_diags(dxt[:,newaxis,:]) * matL * matGradTri
+        matJacdWR = block_diags(dxt[:,newaxis,:]) * matR * matGradTri
+        self.matJacdWL = spkron(matJacdWL, eye(4)).tocsr()
+        self.matJacdWR = spkron(matJacdWR, eye(4)).tocsr()
 
     def metric(self, W=None):
         if W is None: W = self.soln
         gradV = self.mesh.gradTriVrt(W / self.Wref)
-        # weight by entropy adjoint
-        # q, p, u, c = gask(W)
-        # V = hstack([q[:,newaxis], W[:,1:3], W[:,:1]]) * self.Wref
-        # gradV *= self.mesh.interpTri2Vrt(V)[:,newaxis,:]
+        gradV /= ((gradV**2).sum(1)[:,newaxis,:])**.25
         return (gradV[:,newaxis,:,:] * gradV[:,:,newaxis,:]).sum(-1)
         # return hessian.sum(-1)
 
@@ -303,6 +318,6 @@ if __name__ == '__main__':
     HiRes = 0.0
     
     v, t, b = initMesh(geom, nE)
-    solver = Euler(v, t, b, Mach, HiRes)
+    solver = Euler(v, t, b, Mach)
     for i in range(8):
         solver.checkJacobian()

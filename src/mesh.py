@@ -108,15 +108,12 @@ class Mesh:
 
         self.ieBnd = (self.e[:,3] == self.e[:,2]).nonzero()[0]
 
-
         self.edgOfTri = invertMap(self.e[:,2:])[1].reshape([-1, 3])
-
-
         # EdgeMean when multiplied by values at edges gives values 
         # at triangles by averaging across edges
         self.edgeMean = indexMap( self.edgOfTri[:,0], self.ne, 1./3. )
         for i in xrange(1, 3):
-            self.edgeMean = self.edgeMean + indexMap( self.edgOfTri[:,i], self.ne, 1./3. )
+            self.edgeMean = self.edgeMean + indexMap( self.edgOfTri[:,i], self.ne, 1/3.0)
 
         # Clean up edge Mean matrix
         self.edgeMean.sum_duplicates()
@@ -164,7 +161,6 @@ class Mesh:
         ieInterior = (e[:,2] != e[:,3])
         assert ((dxt2e * n).sum(1)[ieInterior] < 0).all()
 
-    
     def xt(self):
         return self._xt
     

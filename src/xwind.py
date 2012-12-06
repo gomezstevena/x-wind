@@ -23,9 +23,9 @@ from scipy.interpolate import griddata
 
 def chooseSolver(v, t, b, Mach, Re):
     if isfinite(Re):
-        return NavierStokes(v, t, b, Mach, Re, HiRes=1)
+        return NavierStokes(v, t, b, Mach, Re)
     else:
-        return Euler(v, t, b, Mach, HiRes=1)
+        return Euler(v, t, b, Mach)
 
 
 class SolverGuiCoupler:
@@ -36,11 +36,10 @@ class SolverGuiCoupler:
         self.buttons = buttons
         self.combobox = combobox
 
-        self.Mach = 0.5
-        self.Re = inf #12800
-        self.nE = 845 #250
-        self.geom = rotate(loadtxt('../data/n0012c.dat'), .5)
-        # self.geom = rotate(loadtxt('../data/default.dat'), 0)
+        self.Mach = 0.3
+        self.Re = 1000
+        self.nE = 1250
+        self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
         self.buttons['MachDisp'].set_label('Mach = {0}'.format(self.Mach))
         self.buttons['ReDisp'].set_label('Re = {0}'.format(self.Re))
@@ -54,7 +53,7 @@ class SolverGuiCoupler:
         self.solnLock = threading.Lock()
         c, d = centerDiameter(self.geom)
         self.dt = 0.02 * d / 300.
-        self.dt *= 10
+        self.dt = 0.002
         nV = self.solver.mesh.v.shape[0]
         self.metric = zeros([nV, 2, 2]) # metric for adaptation
         self.solutionList = []
@@ -100,6 +99,7 @@ class SolverGuiCoupler:
         'Change in geometry, new solver, new mesh, starting from freestream'
         self.terminateSolver()
         v, t, b = initMesh(self.geom, self.nE)
+        print "v:{0}\nt:{1}\nb:{2}\ngeom:{3}".format(v.shape, t.shape, b.shape, self.geom.shape)
         self.vis = Visualize(v, t, extractEdges(v, t), self.fig, self.win)
         self.solver = chooseSolver(v, t, b, self.Mach, self.Re)
         self.solver.integrate(1E-9, self.solver.freeStream())
@@ -233,7 +233,7 @@ buttons['NEUp'] = gtk.ToolButton(gtk.STOCK_GO_FORWARD)
 fig = Figure()
 canvas = FigureCanvas(fig)  # a gtk.DrawingArea
 nav = NavigationToolbar(canvas, win)
-nav.set_size_request(200, 35);
+nav.set_size_request(250, 35);
 
 sep = [gtk.SeparatorToolItem() for i in range(10)]
 
@@ -284,6 +284,10 @@ def destroyAll(*x):
     gtk.main_quit()
 
 win.connect("destroy", destroyAll)
+
+from pathdrawer import Path
+
+pather = Path(xwind)
 
 '''
 def on_click(e):

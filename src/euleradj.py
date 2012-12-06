@@ -24,16 +24,6 @@ def gaskAdj(W, Qq=None, Qp=None, Qu=None, Qc=None, gamma=1.4):
     assert Qc is None and Qu is None     # not implemented yet
     return Q
 
-def cellAvg(mesh, value, isAdjoint=False):
-    if not mesh.__dict__.has_key('matCellAvg'):
-        mat2 = accumarray(mesh.e[:,2], mesh.t.shape[0]).mat
-        mat3 = accumarray(mesh.e[:,3], mesh.t.shape[0]).mat
-        mesh.matCellAvg = 0.5 * (mat2 + mat3)
-    if isAdjoint:
-        return mesh.matCellAvg * value
-    else:
-        return mesh.matCellAvg.T * value
-
 def wallBcAdj(W, Qflux, n):
     assert W.shape == Qflux.shape == n.shape[:1] + (4,)
     Qp = (Qflux[:,1:3] * n).sum(1)

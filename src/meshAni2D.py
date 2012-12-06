@@ -21,7 +21,7 @@ def aftMesh(xy, d=None):
     '''
     xy = array(xy, float)
     assert xy.shape[1] == 2
-    assert (xy[-1] == xy[0]).all()  # that's right, comparing floating poinst
+    #assert (xy[-1] == xy[0]).all()  # that's right, comparing floating poinst
     center, diameter = centerDiameter(xy)
     if d is not None: diameter = d
     # far field
