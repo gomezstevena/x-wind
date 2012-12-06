@@ -89,6 +89,7 @@ class CrankNicolson(Ode):
             self.t = t0
 
         t0 = self.t
+        assert self.t < t
         while self.t < t:
             pct_to_go = (self.t - t0)/(t-t0) * 100
             print '{0}%: t = {1}'.format(pct_to_go, self.t )

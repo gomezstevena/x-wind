@@ -285,7 +285,7 @@ def destroyAll(*x):
 
 win.connect("destroy", destroyAll)
 
-
+'''
 def on_click(e):
     print 'Got click event {0}, {1}'.format(e.x, e.y)
 
@@ -294,7 +294,7 @@ def on_move(e):
 
 fig.canvas.mpl_connect('button_press_event', on_click)
 fig.canvas.mpl_connect('motion_notify_event', on_move)
-
+'''
 # ================ Run program ================= #
 win.show_all()
 gtk.main()
