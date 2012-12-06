@@ -12,7 +12,7 @@ from navierstokes import *
 geom = rotate(loadtxt('../data/n0012c.dat'), 30*pi/180)
 # geom = transpose([cos(linspace(0,2*pi,33)), sin(linspace(0,2*pi,33))])
 # geom[-1] = geom[0]
-nE = 750
+nE = 1500
 dt = 0.002
 nsteps = 5
 Mach = 0.3
@@ -41,19 +41,33 @@ for istep, T in enumerate(arange(1,nsteps+1) * dt):
     metric += solver.metric()
 """
 
+"""
 U0 = solver.ode.y
-J0 = solver.J(U0)
-ia = J0.indptr + 1
-ja = J0.indices
+J0 = solver.J(U0).tocsr(True)
+J0.sort_indices()
+ia = [int(i) for i in (J0.indptr + 1)]
+ja = [int(j) for j in (J0.indices + 1)]
 
-import odespy
-ode = odespy.Lsodes( solver.ddt, jac_column=solver.J_col_dumb )
+rtol, atol = 1e-4, 1e-4
+
+import sys
+sys.path.append('../odespy/build/lib.linux-x86_64-2.7/')
+from odespy import *
+
+method = Lsodes
+
+ode = method( solver.ddt, rtol=rtol, atol=atol, jac_column=solver.J_col_dumb, ia=ia, ja=ja, adams_or_bdf='bdf' )
 ode.set_initial_condition( solver.ode.y )
 
-time_steps = r_[:nsteps]*dt
+time_steps = [0, dt]
 
 U, T = ode.solve(time_steps)
-
+"""
+U0 = solver.ode.y
+from integrator import CrankNicolson
+CN = CrankNicolson(solver.ddt, solver.J)
+CN.integrate(1e-8, U0, 0)
+CN.integrate( dt )
 """
 fname = 'data/navierstokesSubsonic_adapt{0:1d}.npz'.format(iAdapt)
 savez(fname, geom=array(geom), v=v, t=t, b=b, soln=solution)

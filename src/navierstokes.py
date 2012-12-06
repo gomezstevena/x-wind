@@ -119,17 +119,16 @@ class NavierStokes(Euler):
         J_flux = (fluxJ_UE*self.matJacUE + fluxJ_gradUE*self.matGradU)*jacW2U
         J_out = Euler.J(self, W) + self.matJacDistFlux*J_flux
 
-        return J_out
+        return J_out#.tobsr(blocksize = (4,4) )
 
     def J_col_dumb(self, W, t, j, ia, ja):
         if "J_store" not in self.__dict__:
             self.J_store = self.J(W)
 
-        JC = self.J_store.getcol(j).todense()
+        JC = self.J_store.getrow(j).data
 
         if j == W.size-1:
             del self.J_store
-            print j, 'deleting store'
         return JC
 
     def J_col(self, W, t, j):
