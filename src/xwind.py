@@ -38,7 +38,7 @@ class SolverGuiCoupler:
 
         self.Mach = 0.3
         self.Re = 1000
-        self.nE = 1250
+        self.nE = 250
         self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
         self.buttons['MachDisp'].set_label('Mach = {0}'.format(self.Mach))
