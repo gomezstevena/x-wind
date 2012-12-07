@@ -13,7 +13,7 @@ geom = rotate(loadtxt('../data/n0012c.dat'), 5*pi/180)
 # geom = transpose([cos(linspace(0,2*pi,33)), sin(linspace(0,2*pi,33))])
 # geom[-1] = geom[0]
 nE = 5000
-dt = 0.001
+dt = 0.005
 nsteps = 25
 Mach = 0.3
 Re = 10000
@@ -47,10 +47,10 @@ for iAdapt in range(1):
     metric = zeros([v.shape[0], 2, 2]) # metric for next adaptation
 
     
-    fig = figure()
-    solver.mesh.plotMesh(0, 0.2)
-    draw()
-    pause(0.01)
+    #fig = figure()
+    #solver.mesh.plotMesh(0, 0.2)
+    #draw()
+    #pause(0.01)
 
     for istep, T in enumerate(arange(1,nsteps+1) * dt):
         print 'istep: {0}'.format(istep)
@@ -58,9 +58,9 @@ for iAdapt in range(1):
         solution[istep] = solver.soln.copy()
         metric += solver.metric()
 
-        WPlot = solution[istep][:,0]
-        solver.mesh.plotTriScalar(WPlot)
-        pause(0.001)
+        #WPlot = solution[istep][:,0]
+        #solver.mesh.plotTriScalar(WPlot)
+        #pause(0.001)
 
 
 
