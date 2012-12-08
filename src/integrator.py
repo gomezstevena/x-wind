@@ -5,7 +5,7 @@ from util import *
 #from IPython import embed
 
 class Ode:
-    def __init__(self, ddt, J, tol=1E-5, dt0=1E-3, dtMax=0.1):
+    def __init__(self, ddt, J, tol=2E-4, dt0=1E-3, dtMax=0.1):
         self.ddt = ddt
         self.J = J
         self.tol = tol
@@ -27,6 +27,7 @@ class Ode:
             t0 = self.t
             self.t = min(t, self.t + self.dt)
             dt, dt0 = self.t - t0, self.dt0
+            dt0 = dt
             print self.t, t0, self.dt
             # Coefficients, y = b0 * y0 + b00 * y00 + a * f(y)
             # BDF2 if dt == dt0, Backward Euler if dt0 == 0
@@ -43,7 +44,7 @@ class Ode:
                     break
                 res = self.y - b0 * self.y0 - b00 * self.y00 - a * dydt
                 resNorm = sqrt((res**2).sum() / (self.y**2).sum())
-                print 'iter {0} with dt={1}, res={2}'.format(i, dt, resNorm)
+                print 'iter {0:d} with dt={1:.2e}, log(res)= {2:.2f}'.format(i, dt, log(resNorm)/log(10) )
                 if resNorm < 1E-9 or resNorm < self.tol or i >= nIterMax:
                     nIter = i + 1
                     break
@@ -51,7 +52,7 @@ class Ode:
                 J = self.J(self.y)
 
                 tmp = self.I - a*J;
-                dy, err = splinalg.gmres( tmp, res , maxiter=10)
+                dy, err = splinalg.bicgstab( tmp, res , maxiter=30)
                 self.y -= dy
 
             if nIter > nIterMax:
@@ -96,7 +97,6 @@ class CrankNicolson(Ode):
             dt = min( t-self.t, self.dt ) #agressive
 
             self.f0 = self.ddt(self.y0)
-            #self.y = self.guess_step(self.dt)
 
 
             nIterMin, nIterMax = 3, 15
@@ -109,7 +109,7 @@ class CrankNicolson(Ode):
                 f = self.ddt(self.y)
                 res = (self.y - self.y0) - (.5*dt)*( self.f0 + f )
                 resNorm = sqrt( nnorm(res)/nnorm(self.y)  )
-                #stdout.write( '{0}: with dt={1}, res={2}\n'.format(nIter, dt, resNorm) ); stdout.flush()
+                stdout.write( '{0}: with dt={1}, res={2}\n'.format(nIter, dt, resNorm) ); stdout.flush()
                 if resNorm < 1E-9 or resNorm < self.tol or nIter >= nIterMax:
                     break
 
@@ -117,11 +117,11 @@ class CrankNicolson(Ode):
 
                 dRdu = self.I - (dt/2)*J
 
-                dy, err = splinalg.gmres( dRdu, res, x0 = dt*self.f0, tol=self.tol, maxiter = 10)
+                dy, err = splinalg.bicgstab( dRdu, res )
                 self.y -= dy
 
             if nIter >= nIterMax:
-                self.y[:] = self.guess_step(dt)
+                self.y[:] = self.y0
                 self.dt *= 0.5
                 print 'bad, dt =', dt, self.dt
             else:

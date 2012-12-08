@@ -147,7 +147,7 @@ class Euler:
     def __init__(self, v, t, b, Mach):
         self.mesh = Mesh(v, t, b)
         self.Mach = float(Mach)
-        self.ode = CrankNicolson(self.ddt, self.J)
+        self.ode = Ode(self.ddt, self.J)
 
     def integrate(self, *args, **argv):
         return self.ode.integrate(*args, **argv)

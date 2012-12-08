@@ -1,8 +1,8 @@
 import numpy as np
 from util import *
+
+
 class Path(object):
-
-
 
 	def __init__(self, xwind_gui):
 		self.path_active = False
@@ -78,7 +78,7 @@ def pathSmoother( path ):
 	sm = np.r_[ 0.0, np.cumsum( dsm ) ]
 
 	n = path.shape[0]
-	p , ss = signal.resample(path, 50, t = sm, axis=0, window = ('gaussian', 7) )
+	p , ss = signal.resample(path, 100, t = sm, axis=0, window = ('gaussian', 10) )
 
 	p = np.vstack([p, p[0]])
 
@@ -122,6 +122,23 @@ def splitPath(path, points):
 
 	return all_paths
 
+def joinPath(path, ij):
+	n_inter = len(ij)
+
+	if n_inter > 0:
+		i, j = ij[0]
+		beg, mid, end = path[:i+1], path[i+1:j+1], path[j+1:]
+
+		ij_new = (j-1) - ij[1:,::-1]
+		new_mid = joinPath( mid[::-1], ij_new )
+
+		new_path = np.vstack( [beg, new_mid, end] )
+
+		return new_path
+
+	else:
+		return path
+
 
 def segmentIntersect( l1, l2 ):
 	p = l1[0]
@@ -147,6 +164,15 @@ def segmentIntersect( l1, l2 ):
 
 	return in_segment, loc
 
+def handleIntersect(path):
+	intersect, points = selfIntersect(path)
+	if intersect:
+		ij = np.array( [ (i,j) for (i,j,p) in points ] )
+		new_path = joinPath(path, ij )
+		return new_path
+	else:
+		return path
+
 
 if __name__ == '__main__':
 	
@@ -163,11 +189,27 @@ if __name__ == '__main__':
 
 	figure()
 	#plot( path_raw[:,0], path_raw[:,1], '-', path[:,0], path[:,1], '-x' )
+	#plot( *path.T )
 	#savefig('smoothing.pdf')
-	intersect, points = selfIntersect(path)
-	new_paths = splitPath(path, points)
 
+	path_si = handleIntersect(path)
+
+
+	path_is = handleIntersect(path_raw)
+	path_is = pathSmoother(path_is)
+
+	path_sis = pathSmoother(path_si)
+	#plot( c_[ path[i,0], path[i+1,0] ], c_[ path[i,1], path[i+1,1] ], 's')
+
+	plot( path_raw[:,0], path_raw[:,1], '--b')
+	plot( path_is[:,0], path_is[:,1], '-g' )
+	plot( path_si[:,0], path_si[:,1], '-r')
+	plot( path_sis[:,0], path_sis[:,1], '-k')
+
+	legend( ['raw path', 'intersect -> smooth', 'smooth -> intersect', 'smooth -> intersect -> smooth'] )
+
+	'''new_paths = splitPath(path, points)
 	for npa in new_paths:
 		plot( npa[:,0], npa[:,1], '--o' )
 
-	savefig('splitting.pdf')
+	savefig('splitting.pdf')'''

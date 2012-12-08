@@ -28,7 +28,7 @@ def chooseSolver(v, t, b, Mach, Re):
         return Euler(v, t, b, Mach)
 
 
-class SolverGuiCoupler:
+class SolverGuiCoupler (object):
     def __init__(self, win, fig, buttons, combobox):
         self.win = win
         self.fig = fig
@@ -38,7 +38,7 @@ class SolverGuiCoupler:
 
         self.Mach = 0.3
         self.Re = 1000
-        self.nE = 250
+        self.nE = 2500
         self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
         self.buttons['MachDisp'].set_label('Mach = {0}'.format(self.Mach))
@@ -53,7 +53,7 @@ class SolverGuiCoupler:
         self.solnLock = threading.Lock()
         c, d = centerDiameter(self.geom)
         self.dt = 0.02 * d / 300.
-        self.dt = 0.002
+        self.dt = 0.001
         nV = self.solver.mesh.v.shape[0]
         self.metric = zeros([nV, 2, 2]) # metric for adaptation
         self.solutionList = []
