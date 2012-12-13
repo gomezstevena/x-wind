@@ -1,24 +1,29 @@
 import numpy as np
 from util import *
 
+from IPython import embed
 
 class Path(object):
 
-	def __init__(self, xwind_gui):
+	def __init__(self, xwind_gui, nav):
 		self.path_active = False
 		self.path = []
 		self.xwind_gui = xwind_gui
+		self.nav = nav
 
 		event_dict = { \
 		'button_press_event': self.onClick,
 		'button_release_event': self.onRelease,
 		'motion_notify_event': self.onMouseMove,
 		'figure_enter_event': self.clearPath,
-		'figure_leave_event': self.clearPath
+		'figure_leave_event': self.clearPath,
+		'draw_event': self.onDraw
 		}
 
 		for event_name, event_func in event_dict.iteritems():
 			xwind_gui.fig.canvas.mpl_connect(event_name, event_func)
+
+		self.path_plot = ( ( xwind_gui.fig.get_axes()[0] ).plot(-1000,-1000, '-k', linewidth=2) )[0]
 
 
 	def clearPath(self, event = None):
@@ -27,7 +32,7 @@ class Path(object):
 
 	def onClick(self, event):
 		#print 'A Click!'
-		if not self.path_active:
+		if not self.path_active and not self.nav._active:
 			self.path_active = True
 			self.path = [ (event.xdata, event.ydata) ]
 
@@ -36,38 +41,37 @@ class Path(object):
 		if self.path_active:
 			self.path.append( (event.xdata, event.ydata) )
 			path = self.path
-			self.clearPath()
 			self.finishPath( path )
-			
 
+			self.clearPath()
+			
 	def onMouseMove(self, event):
 		#print 'A movement!'
 		if self.path_active:
 			#print 'A drag'
 			self.path.append( (event.xdata, event.ydata) )
-
+			#self.onDraw(None)
 
 	def finishPath(self, path):
 		path.append( path[0] )
 		path = np.array( path )
 
-		np.save('raw_path.npy', path)
-
-
-		path = pathSmoother(path)
-
-		np.save('example_path.npy', path)
-
-
-		print path, path.shape
-
-		
+		#np.save('raw_path.npy', path)
+		path = fixPath(path)
+		print path
+		print 'path.shape =', path.shape
+		#np.save('example_path.npy', path)
 		self.xwind_gui.geom = np.vstack([self.xwind_gui.geom, path])
 		self.xwind_gui.changeGeom()
+
+	def onDraw(self, event):
+		if self.path:
+			self.path_plot.set_data( np.array(self.path).T )
+			self.xwind_gui.fig.canvas.draw()
 		
  
 
-from IPython import embed
+#from IPython import embed
 from matplotlib.pyplot import *
 from scipy import signal
 def pathSmoother( path ):
@@ -78,7 +82,7 @@ def pathSmoother( path ):
 	sm = np.r_[ 0.0, np.cumsum( dsm ) ]
 
 	n = path.shape[0]
-	p , ss = signal.resample(path, 100, t = sm, axis=0, window = ('gaussian', 10) )
+	p , ss = signal.resample(path, 50, t = sm, axis=0, window = ('gaussian', 10) )
 
 	p = np.vstack([p, p[0]])
 
@@ -173,6 +177,12 @@ def handleIntersect(path):
 	else:
 		return path
 
+
+def fixPath( path ):
+	path_i = handleIntersect(path)
+	path_is = pathSmoother(path_i)
+
+	return path_is
 
 if __name__ == '__main__':
 	

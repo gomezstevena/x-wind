@@ -44,7 +44,7 @@ class Ode:
                     break
                 res = self.y - b0 * self.y0 - b00 * self.y00 - a * dydt
                 resNorm = sqrt((res**2).sum() / (self.y**2).sum())
-                print 'iter {0:d} with dt={1:.2e}, log(res)= {2:.2f}'.format(i, dt, log(resNorm)/log(10) )
+                print 'iter {0:d} with dt={1:.2e}, log_10(res)= {2:.2f}'.format(i, dt, log10(resNorm) )
                 if resNorm < 1E-9 or resNorm < self.tol or i >= nIterMax:
                     nIter = i + 1
                     break

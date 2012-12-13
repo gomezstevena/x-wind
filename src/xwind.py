@@ -20,6 +20,8 @@ from matplotlib.backends.backend_gtkagg \
      import NavigationToolbar2GTKAgg as NavigationToolbar
 
 from scipy.interpolate import griddata
+from util import linNearGrid
+
 
 def chooseSolver(v, t, b, Mach, Re):
     if isfinite(Re):
@@ -37,7 +39,7 @@ class SolverGuiCoupler (object):
         self.combobox = combobox
 
         self.Mach = 0.3
-        self.Re = 1000
+        self.Re = inf
         self.nE = 2500
         self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
@@ -53,7 +55,8 @@ class SolverGuiCoupler (object):
         self.solnLock = threading.Lock()
         c, d = centerDiameter(self.geom)
         self.dt = 0.02 * d / 300.
-        self.dt = 0.001
+        #self.dt = self.solver.ode.dt
+        self.dt = 1.0e-3
         nV = self.solver.mesh.v.shape[0]
         self.metric = zeros([nV, 2, 2]) # metric for adaptation
         self.solutionList = []
@@ -122,7 +125,8 @@ class SolverGuiCoupler (object):
         e = extractEdges(v, t)
         self.vis = Visualize(v, t, e, self.fig, self.win, axesLimit)
         self.solver = chooseSolver(v, t, b, self.Mach, self.Re)
-        W0 = griddata(xt0, W0, self.solver.mesh.xt(), method='nearest')
+        #W0 = griddata(xt0, W0, self.solver.mesh.xt(), method='nearest')
+        W0 = linNearGrid(xt0, W0, self.solver.mesh.xt() )
         W0 += self.solver.freeStream(1) - freeStream0
         self.solver.integrate(1E-9, W0)
         self._soln_copy = self.solver.soln.copy()
@@ -286,8 +290,9 @@ def destroyAll(*x):
 win.connect("destroy", destroyAll)
 
 from pathdrawer import Path
+pather = Path(xwind, nav)
 
-pather = Path(xwind)
+#embed()
 
 '''
 def on_click(e):
