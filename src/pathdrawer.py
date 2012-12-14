@@ -48,7 +48,7 @@ class Path(object):
 	def onMouseMove(self, event):
 		#print 'A movement!'
 		if self.path_active:
-			#print 'A drag'
+			print 'A drag'
 			self.path.append( (event.xdata, event.ydata) )
 			#self.onDraw(None)
 
@@ -72,7 +72,7 @@ class Path(object):
  
 
 #from IPython import embed
-from matplotlib.pyplot import *
+
 from scipy import signal
 def pathSmoother( path ):
 	x, y = path.T
@@ -185,7 +185,7 @@ def fixPath( path ):
 	return path_is
 
 if __name__ == '__main__':
-	
+	from matplotlib.pyplot import *
 	path_raw = np.load('raw_path.npy')
 	path = pathSmoother( path_raw )
 
