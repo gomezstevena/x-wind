@@ -6,7 +6,8 @@ from scipy.sparse import linalg as splinalg
 
 from mesh import *
 from euler import *
-from eulerlowdiss import *
+#from eulerlowdiss import *
+
 
 def fluxV(UE, gradUE, n):
     '''
@@ -107,7 +108,7 @@ class NavierStokes(Euler):
         fluxJ_UE, fluxJ_gradUE = jacV(uE, graduE, m.n)
         fluxJ_UE = block_diags(self.mu * fluxJ_UE.reshape((-1,4,2)))
         fluxJ_gradUE = block_diags(self.mu * fluxJ_gradUE.reshape((-1,4,4)))
-        #embed()
+
         J_flux = (fluxJ_UE*self.matJacUE + fluxJ_gradUE*self.matGradU)*jacW2U
         J_out = Euler.J(self, W) + self.matJacDistFlux*J_flux
 
@@ -135,9 +136,9 @@ class NavierStokes(Euler):
         matGradU = m.matGradTriEdg + m.bcmatGradTriEdg * matJacUBc
         self.matGradU = spkron(matGradU, eye(2)).tocsr()
         # velocity avarage matrix
-        matL = accumarray(m.e[:,2], m.t.shape[0]).mat.T
-        matR = accumarray(m.e[:,3], m.t.shape[0]).mat.T
-        self.matJacUE = spkron(0.5 * (matL + matR), eye(2)).tocsr()
+        #matL = accumarray(m.e[:,2], m.t.shape[0]).mat.T
+        #matR = accumarray(m.e[:,3], m.t.shape[0]).mat.T
+        self.matJacUE = spkron( m.e_map, eye(2), format='csr')
 
     def metric(self, W=None):
         '''

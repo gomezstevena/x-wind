@@ -123,6 +123,7 @@ class Mesh:
         self.l_map = indexMap(self.e[:,2], self.nt)
         self.r_map = indexMap(self.e[:,3], self.nt)
         self.lr_map = sparse.vstack([self.l_map, self.r_map], format='csr')
+        self.e_map = 0.5*(self.l_map + self.r_map)
 
         ## X-location of each triangle center
         self._xt = self.v[self.t,:].mean(1)
