@@ -9,6 +9,7 @@ import scipy.sparse.linalg as splinalg
 
 from meshUtils import *
 
+
 def interpTri2Vrt(mesh, phi):
     a0 = accumarray(ravel(mesh.t[:,0]), mesh.v.shape[0])
     a1 = accumarray(ravel(mesh.t[:,1]), mesh.v.shape[0])

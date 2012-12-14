@@ -1,6 +1,7 @@
-from numpy import dot, einsum, isnan, all
+from numpy import dot, einsum, isnan, all, zeros, array
 
 from scipy.interpolate import griddata
+from math import sqrt
 
 
 def dot_all(a,b):
@@ -23,6 +24,13 @@ def linNearGrid( x0, W0, xn ):
 	assert all(  ~isnan(W) )
 
 	return W
+
+def freeStream(Mach, nT=1):
+    R, gamma, rho0, T0 = 8.314 / 29E-3, 1.4, 1.225, 288.75
+    u0 = Mach * sqrt(gamma * R * T0)
+    E0 = T0 * R / (gamma - 1) + 0.5 * u0**2
+    return array([rho0, rho0 * u0, 0, rho0 * E0]) + zeros([nT, 1])
+
 
 class Dummy(object):
     def __getattr__(self, attr):

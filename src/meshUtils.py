@@ -82,6 +82,7 @@ def triArea(v, t):
     crossProd = dp1[:,0] * dp2[:,1] - dp1[:,1] * dp2[:,0]
     return .5 * abs(crossProd)
 
+
 def edgNormal(v, e):
     '''
     Inputs v, e have the same format as ani2D
@@ -92,6 +93,10 @@ def edgNormal(v, e):
     dp = v[e[:,1],:] - v[e[:,0],:]
     dp[:,1] *= -1
     return dp[:,[1,0]]
+
+
+def triCenters(v, t):
+    return v[t,:].mean(1)
 
 if __name__ == '__main__':
     n = 25
