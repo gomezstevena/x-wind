@@ -91,6 +91,7 @@ class Visualize:
         self.p = PatchCollection(self.p, edgecolors='none')
         self.l = LineCollection(v[e[:,:2]])
 
+        win = win or fig.canvas.manager.window
         if fig is None: fig = gcf()
         fig.clf()
         ax = fig.add_axes([0.02,0.02,.98,.98])
@@ -112,6 +113,7 @@ class Visualize:
         self.l.set_array(phi[self.e[:,2:]].mean(1))
         if not self.__dict__.has_key('colorbar'):
             self.colorbar = self.fig.colorbar(self.p)
-        self.win.set_title(title)
+        #self.win.set_title(title)
+        self.fig.canvas.set_window_title(title)
         self.fig.canvas.draw()
 

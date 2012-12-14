@@ -16,7 +16,7 @@ def linNearGrid( x0, W0, xn ):
 	W = griddata(x0, W0, xn, method='linear')
 	i_nan = all( isnan(W), axis=1 )
 
-	print i_nan, i_nan.sum()
+	#print i_nan, i_nan.sum()
 
 	W[i_nan] = griddata(x0, W0, xn[i_nan], method='nearest' )
 

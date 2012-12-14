@@ -39,7 +39,7 @@ class SolverGuiCoupler (object):
         self.combobox = combobox
 
         self.Mach = 0.3
-        self.Re = inf
+        self.Re = 12500
         self.nE = 2500
         self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
@@ -292,18 +292,7 @@ win.connect("destroy", destroyAll)
 from pathdrawer import Path
 pather = Path(xwind, nav)
 
-#embed()
 
-'''
-def on_click(e):
-    print 'Got click event {0}, {1}'.format(e.x, e.y)
-
-def on_move(e):
-    print 'Moved to {0}, {1}'.format(e.x, e.y)
-
-fig.canvas.mpl_connect('button_press_event', on_click)
-fig.canvas.mpl_connect('motion_notify_event', on_move)
-'''
 # ================ Run program ================= #
 win.show_all()
 gtk.main()
