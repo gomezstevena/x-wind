@@ -55,7 +55,7 @@ class SolverProcess(mp.Process):
 
 
 class SimpleGui(object):
-	def __init__(self):
+	def __init__(self, qlen = 2):
 		self.fig = figure()
 		self.fig.show()
 
@@ -64,7 +64,7 @@ class SimpleGui(object):
 		self.ne = 2500
 		self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
 
-		self.data_queue = mp.Queue(10)
+		self.data_queue = mp.Queue(qlen)
 		v, t, b = initMesh(self.geom, self.ne )
 		self.vis = Visualize(v, t, extractEdges(v, t), self.fig, None)
 
