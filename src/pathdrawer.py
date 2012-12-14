@@ -48,7 +48,7 @@ class Path(object):
 	def onMouseMove(self, event):
 		#print 'A movement!'
 		if self.path_active:
-			print 'A drag'
+			#print 'A drag'
 			self.path.append( (event.xdata, event.ydata) )
 			#self.onDraw(None)
 
