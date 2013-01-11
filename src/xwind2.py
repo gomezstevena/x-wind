@@ -149,11 +149,12 @@ class SolverGui(object):
                 self.vis.update('MIT xWind  t ={0:10.6f}'.format(t), field)
 
                 self.metric = 0.99*self.metric + 0.01*new_metric
-            except:
-                print 'no data available?'
+            except e:
+                print 'no data available?', e
+                #return False
 
         else:
-            print 'data queue is empty'
+            pass#print 'data queue is empty'
 
         return True
 

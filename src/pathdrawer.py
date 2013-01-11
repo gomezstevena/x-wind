@@ -29,6 +29,7 @@ class Path(object):
     def clearPath(self, event = None):
         self.path_active = False
         self.path = []
+        #self.xwind_gui.set_data( (0,0) )
 
     def onClick(self, event):
         #print 'A Click!'
@@ -51,13 +52,11 @@ class Path(object):
         if self.path_active:
             #print 'A drag'
             self.path.append( (event.xdata, event.ydata) )
-
             #self.onDraw(None)
 
     def finishPath(self, path):
         path.append( path[0] )
         path = np.array( path )
-
         #np.save('raw_path.npy', path)
         path = fixPath(path)
         print path
@@ -70,8 +69,6 @@ class Path(object):
         if self.path:
             self.path_plot.set_data( np.array(self.path).T )
             self.xwind_gui.fig.canvas.draw()
-        
- 
 
 #from IPython import embed
 
@@ -181,10 +178,10 @@ def handleIntersect(path):
 
 
 def fixPath( path ):
-    path_i = handleIntersect(path)
-    path_is = pathSmoother(path_i)
+    path = handleIntersect(path)
+    path = pathSmoother(path)
 
-    return path_is
+    return path
 
 if __name__ == '__main__':
     from matplotlib.pyplot import *
