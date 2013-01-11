@@ -99,27 +99,29 @@ class SolverGui(object):
         self.Mach = 0.3
         self.M0 = self.Mach
 
-        self.Re = 12500
-        self.nE = 500
+        self.Re = inf
+        self.nE = 2500
         self.geom = rotate(loadtxt('../data/n0012c.dat'), 2./180*pi)
         # self.geom = array([[1, 0], [0, 1], [-1, 0], [0, -1], [1, 0]])
         self.buttons['MachDisp'].set_label('Mach = {0}'.format(self.Mach))
         self.buttons['ReDisp'].set_label('Re = {0}'.format(self.Re))
         self.buttons['NEDisp'].set_label('{0} cells'.format(self.nE))
 
-
-        self.data_queue = mp.Queue(queue_length)
+        self.queue_length = queue_length
+        self.data_queue = mp.Queue(self.queue_length)
 
         self.changeGeom()
-        gobject.timeout_add(100, self.update)
+        gobject.idle_add(self.update)
+
+        self.update_time = time.time()
 
 
     def terminateSolver(self):
         'Terminate the solver thread running "self.advance()"'
         if hasattr(self, 'solver') and self.solver.is_alive():
             self.solver.terminate()
-            #self.data_queue.close()
             self.isKeepRunning = False
+            self.data_queue = mp.Queue(self.queue_length)
         
     def startSolver(self):
         'Start the solver thread running "self.advance()"'
@@ -133,27 +135,33 @@ class SolverGui(object):
     def update(self):
         'Called automatically every second to update screen'
         #print 'trying to update'
-        if not self.data_queue.empty():
+        if not self.data_queue.empty() and self.isKeepRunning:
 
             try:
                 #self.solnLock.acquire()
                 #t, soln = self._soln_t, self._soln_copy.copy()
-                data = self.data_queue.get(False)
+                #print 'getting data ...',
+                data = self.data_queue.get(True)
                 #print 'got data!!!'
 
                 t = data.time
                 self.last_soln = data.soln
                 new_metric = data.metric
 
+                #self.data_queue.task_done()
+
                 field = physical(self.last_soln, self.combobox.get_active_text())
-                self.vis.update('MIT xWind  t ={0:10.6f}'.format(t), field)
+                new_time = time.time()
+                self.update_time, dt = new_time, new_time - self.update_time
+                self.vis.update('MIT xWind  t ={0:10.6f}:\t {1:.2f}FPS'.format(t, 1.0/dt), field)
 
                 self.metric = 0.99*self.metric + 0.01*new_metric
-            except:
-                print 'no data available?'
+            except e:
+                print 'no data available?, e =', e
 
         else:
-            print 'data queue is empty'
+            pass
+            #print 'data queue is empty'
 
         return True
 

@@ -2,7 +2,6 @@ import multiprocessing as mp
 
 
 import matplotlib
-matplotlib.use('GTKAgg')
 
 from matplotlib.pyplot import *
 from numpy import *

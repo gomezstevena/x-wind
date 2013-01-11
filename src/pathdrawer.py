@@ -29,6 +29,7 @@ class Path(object):
     def clearPath(self, event = None):
         self.path_active = False
         self.path = []
+        #self.path_plot.set_data(-1000, -1000)
 
     def onClick(self, event):
         #print 'A Click!'
@@ -52,7 +53,7 @@ class Path(object):
             #print 'A drag'
             self.path.append( (event.xdata, event.ydata) )
 
-            #self.onDraw(None)
+            self.onDraw()
 
     def finishPath(self, path):
         path.append( path[0] )
@@ -66,8 +67,8 @@ class Path(object):
         self.xwind_gui.geom = np.vstack([self.xwind_gui.geom, path])
         self.xwind_gui.changeGeom()
 
-    def onDraw(self, event):
-        if self.path:
+    def onDraw(self, event = None):
+        if self.path_active:
             self.path_plot.set_data( np.array(self.path).T )
             self.xwind_gui.fig.canvas.draw()
         
@@ -84,7 +85,7 @@ def pathSmoother( path ):
     sm = np.r_[ 0.0, np.cumsum( dsm ) ]
 
     n = path.shape[0]
-    p , ss = signal.resample(path, 50, t = sm, axis=0, window = ('gaussian', 10) )
+    p , ss = signal.resample(path, 50, t = sm, axis=0, window = ('gaussian', 7) )
 
     p = np.vstack([p, p[0]])
 
@@ -181,15 +182,28 @@ def handleIntersect(path):
 
 
 def fixPath( path ):
-    path_i = handleIntersect(path)
-    path_is = pathSmoother(path_i)
+    path = pathSmoother(path)
+    path = handleIntersect(path)
+    path = pathSmoother(path)
+    #path = makeCCW(path)
 
-    return path_is
+    return path
+
+def makeCCW(path):
+    dx = np.diff(path, axis=0)
+    theta = np.arctan2( dx[:,1], dx[:,0] )
+    dtheta = np.diff(theta, axis=0) 
+
+
+    th = dtheta.sum()
+    print 'theta =', th
+    #embed()
+    return path if th > 0 else path[::-1]
 
 if __name__ == '__main__':
     from matplotlib.pyplot import *
     path_raw = np.load('raw_path.npy')
-    path = pathSmoother( path_raw )
+    path = fixPath(path_raw)
 
     """
     l1 = np.array( [ [0,0], [1,1.] ] )
@@ -200,28 +214,10 @@ if __name__ == '__main__':
     b, p = segmentIntersect(l1, l2)"""
 
     figure()
+    plot(*path_raw.T)
+    plot(*path.T)
     #plot( path_raw[:,0], path_raw[:,1], '-', path[:,0], path[:,1], '-x' )
     #plot( *path.T )
     #savefig('smoothing.pdf')
 
-    path_si = handleIntersect(path)
-
-
-    path_is = handleIntersect(path_raw)
-    path_is = pathSmoother(path_is)
-
-    path_sis = pathSmoother(path_si)
-    #plot( c_[ path[i,0], path[i+1,0] ], c_[ path[i,1], path[i+1,1] ], 's')
-
-    plot( path_raw[:,0], path_raw[:,1], '--b')
-    plot( path_is[:,0], path_is[:,1], '-g' )
-    plot( path_si[:,0], path_si[:,1], '-r')
-    plot( path_sis[:,0], path_sis[:,1], '-k')
-
-    legend( ['raw path', 'intersect -> smooth', 'smooth -> intersect', 'smooth -> intersect -> smooth'] )
-
-    '''new_paths = splitPath(path, points)
-    for npa in new_paths:
-        plot( npa[:,0], npa[:,1], '--o' )
-
-    savefig('splitting.pdf')'''
+    
