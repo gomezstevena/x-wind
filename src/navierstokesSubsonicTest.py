@@ -1,6 +1,9 @@
 import matplotlib
 #matplotlib.use('Agg')
 import os
+
+from frame_save import FrameSaver, FrameToMovie
+
 from pylab import *
 from numpy import *
 from scipy.integrate import ode
@@ -12,20 +15,18 @@ from navierstokes import *
 geom = rotate(loadtxt('../data/n0012c.dat'), 5*pi/180)
 # geom = transpose([cos(linspace(0,2*pi,33)), sin(linspace(0,2*pi,33))])
 # geom[-1] = geom[0]
-nE = 5000
+nE = 500
 dt = 0.005
-nsteps = 25
+nsteps = 50
 Mach = 0.3
 Re = 10000
 HiRes = 1.
 diameter = 3
 
-from IPython import embed
-
-ion()
-
 if not os.path.exists('fig'): os.mkdir('fig')
 if not os.path.exists('data'): os.mkdir('data')
+
+
 
 for iAdapt in range(1):
     print 'Adapt cycle {0}'.format(iAdapt)
@@ -33,6 +34,7 @@ for iAdapt in range(1):
     if iAdapt == 0:
         v, t, b = initMesh(geom, nE, diameter)
         solver = NavierStokes(v, t, b, Mach, Re)
+        saver = FrameSaver(v,t,b)
         # solver = Euler(v, t, b, Mach, HiRes)
         solver.integrate(1E-8, solver.freeStream())
     else:
@@ -58,6 +60,8 @@ for iAdapt in range(1):
         solution[istep] = solver.soln.copy()
         metric += solver.metric()
 
+        saver.update_data( solution[istep] )
+
         #WPlot = solution[istep][:,0]
         #solver.mesh.plotTriScalar(WPlot)
         #pause(0.001)
@@ -76,3 +80,8 @@ for iAdapt in range(1):
     axis([-.1,.3,-.2,.2])
     savefig('fig/navierstokesSubsZoom_adapt{0:1d}.png'.format(iAdapt))  
     """
+
+
+    movie = FrameToMovie()
+
+    movie.make_plots()
