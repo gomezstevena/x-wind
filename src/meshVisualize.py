@@ -23,14 +23,14 @@ def plotMesh(mesh, detail, alpha):
         plot([xe[:,0], xe[:,0]+.2*n[:,0]], [xe[:,1], xe[:,1]+.2*n[:,1]], '-g')
     axis('scaled')
 
-def plotTriScalar(mesh, phi):
+def plotTriScalar(mesh, phi, norm = None):
     '''
     Contour plot of scalar field phi defined on mesh triangles
     shading is flat, i.e. piecewise constant
     '''
     v, t, b, e, a, n = mesh.v, mesh.t, mesh.b, mesh.e, mesh.a, mesh.n
     assert phi.ndim == 1 and phi.size == t.shape[0]
-    norm = Normalize(phi.min(), phi.max())
+    norm = norm or Normalize(phi.min(), phi.max())
     p = [Polygon(v[ti]) for ti in t]
     p = PatchCollection(p, norm=norm, edgecolors='none')
     l = LineCollection(v[e[:,:2]], norm=norm)
@@ -52,28 +52,28 @@ def plotTriVector(mesh, vec, *argc, **argv):
          *argc, **argv)
     axis('scaled')
 
-def plotEdgScalar(mesh, phi):
+def plotEdgScalar(mesh, phi, norm = None):
     '''
     Contour plot of scalar field phi defined on mesh edges
     shading is flat, i.e. piecewise constant
     '''
     v, t, b, e, a, n = mesh.v, mesh.t, mesh.b, mesh.e, mesh.a, mesh.n
     assert phi.ndim == 1 and phi.size == e.shape[0]
-    norm = Normalize(phi.min(), phi.max())
+    norm = norm or Normalize(phi.min(), phi.max())
     l = LineCollection(v[e[:,:2]], norm=norm)
     l.set_array(phi)
     gca().add_collection(l)
     axis('scaled')
     colorbar(l)
 
-def plotVrtScalar(mesh, phi):
+def plotVrtScalar(mesh, phi, norm=None):
     '''
     Contour plot of scalar field phi defined on mesh vertices
     Represented by circles of proportional size as dual volume area
     '''
     v, t, b, e, a, n = mesh.v, mesh.t, mesh.b, mesh.e, mesh.a, mesh.n
     assert phi.ndim == 1 and phi.size == v.shape[0]
-    norm = Normalize(phi.min(), phi.max())
+    norm = norm or Normalize(phi.min(), phi.max())
     vrtArea = accumarray(ravel(t.T))(ravel([a, a, a])) / 3.
     vrtR = sqrt(vrtArea / pi) * 0.6
     p = [Circle(vi, vrtRi) for vi, vrtRi in zip(v, vrtR)]

@@ -9,6 +9,10 @@ class FrameSaver(object):
 		self.verts, self.tri, self.bnds = v, t, b
 
 		self.path = path
+		if not os.path.isdir(path):
+			os.mkdir(path)
+
+
 		self.prepend_name = prepend_name + '_' if prepend_name!='' else ''
 
 		fname = '{0}mesh_data.npz'.format(self.path + self.prepend_name)
@@ -29,6 +33,7 @@ import matplotlib
 matplotlib.use('Agg')
 from mesh import Mesh
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
 import meshVisualize as mviz
 
@@ -58,32 +63,33 @@ class FrameToMovie(object):
 		self.files = files
 		self.nsteps = len(self.files)
 
-	def _make_plot(self, indx, plotter, extractor, axes = None, **kwargs ):
+	def _make_plot(self, indx, plotter, extractor, norm, axes = None, **kwargs ):
 		assert indx <= self.nsteps
 		fname = self.files[indx]
 		data = np.load(self.path + fname)
 		plt_data = extractor(data)
 
-		plotter(self.mesh, plt_data)
+		plotter(self.mesh, plt_data, norm = norm)
 
 		if axes:
 			plt.axes( axes )
 
-		plt.savefig( fname[:-4] + '.png', **kwargs )
+		plt.savefig( self.path + fname[:-4] + '.png', **kwargs )
 
-	def make_plots(self, plotter = None, extractor = 0, axes = None, **kwargs):
+	def make_plots(self, plotter = None, extractor = 0, norm = None, axes = None, **kwargs):
 		if type(extractor) is int:
-			extractor = lambda d: d[...,extractor]
+			val = extractor
+			extractor = lambda d: d[..., val]
 
 		assert callable(extractor)
 
-		if plotter is None:
-			fname0 = self.files[0]
-			data0 = np.load(self.path + fname0)
-			print data0, data0.shape
-			plt_data0 = extractor(data0)
-			n, d = plt_data0.shape
+		fname0 = self.files[0]
+		data0 = np.load(self.path + fname0)
+		print data0, data0.shape
+		plt_data0 = extractor(data0)
+		(n,)  = plt_data0.shape
 
+		if plotter is None:
 			if n == self.mesh.nt:
 				print 'plotting on triangles'
 				plotter = mviz.plotTriScalar
@@ -97,8 +103,13 @@ class FrameToMovie(object):
 				raise ValueError('Cannot infer plotter')
 
 
+		norm = norm or Normalize( plt_data0.min(), plt_data0.max() )
+
+
 		for i in xrange(self.nsteps):
-			self._make_plot( i, plotter, extractor, axes, **kwargs )
+			print 'Making plot for step', i,
+			self._make_plot( i, plotter, extractor, norm=norm, axes=axes, **kwargs )
+			print '... done'
 
 
 
