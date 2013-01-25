@@ -39,7 +39,8 @@ def plotTriScalar(mesh, phi, norm = None):
     gca().add_collection(p)
     gca().add_collection(l)
     axis('scaled')
-    colorbar(p)
+    axis([-2, 2, -2, 2])
+    #colorbar(p)
 
 def plotTriVector(mesh, vec, *argc, **argv):
     '''

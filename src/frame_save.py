@@ -2,6 +2,10 @@ import numpy as np
 
 import os
 
+def ensure_dir(path):
+	if not os.path.isdir(path):
+		os.mkdir(path)
+
 class FrameSaver(object):
 	def __init__(self, v, t, b, path = './frames/', prepend_name=''):
 		self.step = 0
@@ -9,8 +13,7 @@ class FrameSaver(object):
 		self.verts, self.tri, self.bnds = v, t, b
 
 		self.path = path
-		if not os.path.isdir(path):
-			os.mkdir(path)
+		ensure_dir(path)
 
 
 		self.prepend_name = prepend_name + '_' if prepend_name!='' else ''
@@ -38,10 +41,11 @@ from matplotlib.colors import Normalize
 import meshVisualize as mviz
 
 class FrameToMovie(object):
-	def __init__(self, path = './frames/', prepend_name = '', fps=24):
+	def __init__(self, path = './frames/', prepend_name = '', fps=10, filetype='mp4'):
 		self.path = path
 		self.prepend_name = prepend_name + '_' if prepend_name!='' else ''
 		self.fps = fps
+		self.filetype = filetype if filetype.startswith('.') else ('.' + filetype )
 
 		self.mesh_data_fname = '{0}mesh_data.npz'.format(self.path + self.prepend_name)
 		f = np.load( self.mesh_data_fname )
@@ -78,8 +82,8 @@ class FrameToMovie(object):
 
 	def make_plots(self, plotter = None, extractor = 0, norm = None, axes = None, **kwargs):
 		if type(extractor) is int:
-			val = extractor
-			extractor = lambda d: d[..., val]
+			col = extractor
+			extractor = lambda d: d[..., col]
 
 		assert callable(extractor)
 
@@ -105,12 +109,16 @@ class FrameToMovie(object):
 
 		norm = norm or Normalize( plt_data0.min(), plt_data0.max() )
 
+		ensure_dir(self.path)
 
 		for i in xrange(self.nsteps):
 			print 'Making plot for step', i,
 			self._make_plot( i, plotter, extractor, norm=norm, axes=axes, **kwargs )
 			print '... done'
 
+		f_reg = self.path + "%06d.png"
+		outname = self.path + self.prepend_name + "video.mp4"
+		os.system( 'ffmpeg -i {f_reg} -r {FPS} -o {outname}'.format( f_reg=f_reg, FPS=self.fps, outname=outname) )
 
 
 

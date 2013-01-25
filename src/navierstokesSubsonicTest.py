@@ -15,7 +15,7 @@ from navierstokes import *
 geom = rotate(loadtxt('../data/n0012c.dat'), 5*pi/180)
 # geom = transpose([cos(linspace(0,2*pi,33)), sin(linspace(0,2*pi,33))])
 # geom[-1] = geom[0]
-nE = 500
+nE = 2500
 dt = 0.005
 nsteps = 50
 Mach = 0.3

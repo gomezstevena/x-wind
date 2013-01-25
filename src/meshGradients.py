@@ -75,10 +75,9 @@ def triToEdge(mesh, W):
     Output: WE value on each edge, shape:(ne, vshape)
     '''
     Wf = W.reshape( (mesh.nt, -1) )
-
-    Wlr = mesh.lr_map * Wf
-    Wlr.shape = (2, mesh.ne,) + W.shape[1:]
-    return Wlr.mean(0)
+    We = mesh.e_map * Wf
+    We.shape = (mesh.ne,) + W.shape[1:]
+    return We
 
 def gradTriVrt(mesh, phi, phiBc):
     '''

@@ -1,7 +1,7 @@
-from numpy import dot, einsum, isnan, all, zeros, array
+from numpy import dot, einsum, isnan, all, zeros, array, sqrt
 
 from scipy.interpolate import griddata
-from math import sqrt
+#from math import sqrt
 
 
 def dot_all(a,b):
@@ -11,7 +11,7 @@ def dot_each(a, b):
 	return einsum('ni, ni -> n', a, b)
 
 def nnorm(a):
-	return dot(a.ravel(), a.ravel())
+	return sqrt( dot_each(a,a) )
 
 def linNearGrid( x0, W0, xn ):
 	W = griddata(x0, W0, xn, method='linear')

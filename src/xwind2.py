@@ -118,6 +118,8 @@ class SolverGui(object):
         'Terminate the solver thread running "self.advance()"'
         if hasattr(self, 'solver') and self.solver.is_alive():
             self.solver.terminate()
+            self.data_queue.close()
+            self.data_queue = mp.Queue(2)
             #self.data_queue.close()
             self.isKeepRunning = False
         
